@@ -1,3 +1,127 @@
 'use client';
-import { useEffect,useState } from 'react'; import Link from 'next/link'; import { ArrowRight, Box, Boxes, ClipboardList, DollarSign } from 'lucide-react'; import { api } from '@/lib/api'; import { authStore } from '@/lib/auth'; import type { Category,Order,Product } from '@/lib/types';
-export default function AdminDashboard(){const [products,setProducts]=useState<Product[]>([]);const [categories,setCategories]=useState<Category[]>([]);const [orders,setOrders]=useState<Order[]>([]);useEffect(()=>{const t=authStore.get()||'';Promise.all([api<Product[]>('/products/admin/all',{},t),api<Category[]>('/categories/admin/all',{},t),api<Order[]>('/orders',{},t)]).then(([p,c,o])=>{setProducts(p);setCategories(c);setOrders(o)}).catch(()=>{})},[]);const revenue=orders.filter(o=>o.status!=='cancelled').reduce((s,o)=>s+o.total,0);return <><div className="adminTop"><div><h1>Overview</h1><p>A quick pulse on the Wear It store.</p></div><Link href="/admin/products" className="button sm">Manage products <ArrowRight size={14}/></Link></div><div className="statGrid"><div className="statCard"><div className="statLabel">Products</div><div className="statValue">{products.length}</div><div className="statHint"><Box size={11}/> {products.filter(p=>p.isActive).length} active</div></div><div className="statCard"><div className="statLabel">Categories</div><div className="statValue">{categories.length}</div><div className="statHint"><Boxes size={11}/> Store structure</div></div><div className="statCard"><div className="statLabel">Orders</div><div className="statValue">{orders.length}</div><div className="statHint"><ClipboardList size={11}/> {orders.filter(o=>o.status==='pending').length} pending</div></div><div className="statCard"><div className="statLabel">Order value</div><div className="statValue">${revenue.toFixed(0)}</div><div className="statHint"><DollarSign size={11}/> Non-cancelled orders</div></div></div><section className="adminPanel"><div className="adminPanelHeader"><div><h3>Recent orders</h3><p className="muted">Latest customer activity</p></div><Link href="/admin/orders" className="textButton">All orders</Link></div><div className="adminTableWrap"><table className="adminTable"><thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead><tbody>{orders.slice(0,6).map(o=><tr key={o._id}><td><strong>{o.orderNumber}</strong></td><td>{o.customerName}</td><td>${o.total.toFixed(2)}</td><td><span className={`status ${o.status}`}>{o.status}</span></td></tr>)}{orders.length===0&&<tr><td colSpan={4} className="muted">No orders yet.</td></tr>}</tbody></table></div></section></>}
+
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { ArrowRight, Images, Shirt, Sparkles, Users } from 'lucide-react';
+import { ErrorNote, LoadingState } from '@/components/StateViews';
+import { ApiError, api } from '@/lib/api';
+import { adminSession } from '@/lib/auth';
+import type { AdminStats, TypeUsage } from '@/lib/types';
+
+export default function AdminOverview() {
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [usage, setUsage] = useState<TypeUsage[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const token = adminSession.get();
+    Promise.all([api<AdminStats>('/admin/stats', {}, token), api<TypeUsage[]>('/admin/type-usage', {}, token)])
+      .then(([loadedStats, loadedUsage]) => {
+        setStats(loadedStats);
+        setUsage(loadedUsage);
+      })
+      .catch((caught: unknown) => setError(caught instanceof ApiError ? caught.message : 'Could not load the dashboard.'));
+  }, []);
+
+  return (
+    <>
+      <div className="adminTop">
+        <div>
+          <h1>Overview</h1>
+          <p>How members are using their virtual closets.</p>
+        </div>
+        <Link href="/admin/types" className="button sm">
+          Manage clothing types <ArrowRight size={14} />
+        </Link>
+      </div>
+
+      <ErrorNote message={error} />
+
+      {!stats ? (
+        <LoadingState label="Loading dashboard" />
+      ) : (
+        <>
+          <div className="statGrid">
+            <div className="statCard">
+              <div className="statLabel">Members</div>
+              <div className="statValue">{stats.members}</div>
+              <div className="statHint">
+                <Users size={11} /> Registered closets
+              </div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Wardrobe items</div>
+              <div className="statValue">{stats.items}</div>
+              <div className="statHint">
+                <Shirt size={11} /> Across all members
+              </div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Generated looks</div>
+              <div className="statValue">{stats.looks}</div>
+              <div className="statHint">
+                <Sparkles size={11} /> {stats.readyLooks} ready · {stats.failedLooks} failed
+              </div>
+            </div>
+            <div className="statCard">
+              <div className="statLabel">Personal photos</div>
+              <div className="statValue">{stats.photos}</div>
+              <div className="statHint">
+                <Images size={11} /> Saved for reuse
+              </div>
+            </div>
+          </div>
+
+          <section className="adminPanel">
+            <div className="adminPanelHeader">
+              <div>
+                <h3>Clothing types</h3>
+                <p className="muted">
+                  {stats.activeTypes} of {stats.types} visible to members
+                </p>
+              </div>
+              <Link href="/admin/types" className="textButton">
+                Manage
+              </Link>
+            </div>
+            <div className="adminTableWrap">
+              <table className="adminTable">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Slug</th>
+                    <th>Order</th>
+                    <th>Items</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {usage.map((row) => (
+                    <tr key={row._id}>
+                      <td>
+                        <strong>{row.name}</strong>
+                      </td>
+                      <td className="muted">/{row.slug}</td>
+                      <td>{row.sortOrder}</td>
+                      <td>{row.itemCount}</td>
+                      <td>
+                        <span className={`status ${row.isActive ? 'active' : ''}`}>{row.isActive ? 'Visible' : 'Hidden'}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {usage.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="muted">
+                        No clothing types yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
+    </>
+  );
+}

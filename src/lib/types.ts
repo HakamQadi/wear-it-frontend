@@ -1,13 +1,72 @@
-export type Category = { _id: string; name: string; slug: string; description: string; isActive: boolean };
-export type Product = {
-  _id: string; name: string; slug: string; description: string; categoryId: Category | string;
-  price: number; compareAtPrice?: number; images: string[]; tryOnOverlayUrl: string; sizes: string[];
-  colors: string[]; stock: number; featured: boolean; isActive: boolean; tags: string[];
+export type AccountRole = 'user' | 'admin';
+
+export type SessionUser = { id: string; name: string; email: string; role: AccountRole };
+export type AuthResponse = { accessToken: string; user: SessionUser };
+
+export type ClothingType = {
+  _id: string;
+  name: string;
+  slug: string;
+  description: string;
+  sortOrder: number;
+  isActive: boolean;
 };
-export type SiteContent = { brandName: string; heroTitle: string; heroSubtitle: string; heroCta: string; announcement: string; footerText: string };
-export type CartItem = { product: Product; size: string; color: string; quantity: number };
-export type Order = {
-  _id: string; orderNumber: string; customerName: string; email: string; phone: string; address: string; city: string;
-  notes?: string; subtotal: number; delivery: number; total: number; status: string; createdAt: string;
-  items: { productId: string; name: string; unitPrice: number; quantity: number; size: string; color: string; image?: string }[];
+
+export type WardrobeItem = {
+  _id: string;
+  name: string;
+  typeId: Pick<ClothingType, '_id' | 'name' | 'slug' | 'isActive' | 'sortOrder'> | null;
+  imageUrl: string;
+  color: string;
+  brand: string;
+  notes: string;
+  isArchived: boolean;
+  createdAt: string;
 };
+
+export type UserPhoto = {
+  _id: string;
+  imageUrl: string;
+  label: string;
+  isDefault: boolean;
+  createdAt: string;
+};
+
+export type LookItem = { itemId: string; typeId: string; typeName: string; name: string; imageUrl: string };
+
+export type Look = {
+  _id: string;
+  personImageUrl: string;
+  items: LookItem[];
+  prompt: string;
+  status: 'ready' | 'failed';
+  resultImageUrl: string;
+  errorMessage: string;
+  createdAt: string;
+};
+
+export type SiteContent = {
+  brandName: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroCta: string;
+  announcement: string;
+  footerText: string;
+};
+
+export type AdminStats = {
+  members: number;
+  types: number;
+  activeTypes: number;
+  items: number;
+  photos: number;
+  looks: number;
+  readyLooks: number;
+  failedLooks: number;
+};
+
+export type TypeUsage = Pick<ClothingType, '_id' | 'name' | 'slug' | 'isActive' | 'sortOrder'> & { itemCount: number };
+export type MemberRow = { _id: string; name: string; email: string; createdAt: string; itemCount: number; lookCount: number };
+
+/** The number of clothing types a single look may combine. */
+export const MAX_LOOK_ITEMS = 8;

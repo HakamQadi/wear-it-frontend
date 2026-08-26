@@ -3,42 +3,29 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowRight, LockKeyhole, Shirt } from 'lucide-react';
+import { ArrowRight, Shirt } from 'lucide-react';
 import { ErrorNote } from '@/components/StateViews';
-import { ApiError, api } from '@/lib/api';
-import { adminSession } from '@/lib/auth';
-import type { AuthResponse, SessionUser } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
+import { ApiError } from '@/lib/api';
 
-export default function AdminLogin() {
+export default function LoginPage() {
   const router = useRouter();
+  const { login, user, ready } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const token = adminSession.get();
-    if (!token) return;
-    api<SessionUser>('/auth/me', {}, token)
-      .then((profile) => (profile.role === 'admin' ? router.replace('/admin') : adminSession.clear()))
-      .catch(() => adminSession.clear());
-  }, [router]);
+    if (ready && user) router.replace(user.role === 'admin' ? '/admin' : '/closet');
+  }, [ready, user, router]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const session = await api<AuthResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ email: form.email.trim(), password: form.password }),
-      });
-      if (session.user.role !== 'admin') {
-        setError('This account is not an administrator.');
-        setBusy(false);
-        return;
-      }
-      adminSession.set(session.accessToken);
-      router.replace('/admin');
+      const profile = await login(form.email.trim(), form.password);
+      router.replace(profile.role === 'admin' ? '/admin' : '/closet');
     } catch (caught: unknown) {
       setError(caught instanceof ApiError ? caught.message : 'Could not sign in.');
       setBusy(false);
@@ -55,17 +42,17 @@ export default function AdminLogin() {
           Wear It
         </Link>
         <div className="authQuote">
-          <h1>Run the wardrobe taxonomy.</h1>
-          <p>Manage the clothing types every member picks from, review closet activity and edit the site copy.</p>
+          <h1>Everything you own, ready to try on.</h1>
+          <p>Sign in to open your virtual wardrobe, build an outfit and see it rendered on you.</p>
         </div>
-        <small>Wear It closet CMS</small>
+        <small>Your closet stays private to your account.</small>
       </section>
 
       <section className="authFormWrap">
         <form className="authCard" onSubmit={submit}>
-          <span className="eyebrow">Admin access</span>
+          <span className="eyebrow">Welcome back</span>
           <h2>Sign in.</h2>
-          <p>Administrator accounts only.</p>
+          <p>Use the email you signed up with.</p>
 
           <label className="formField">
             <span>Email</span>
@@ -92,10 +79,12 @@ export default function AdminLogin() {
 
           <ErrorNote message={error} />
           <button className="button" type="submit" disabled={busy}>
-            <LockKeyhole size={17} />
             {busy ? 'Signing in…' : 'Sign in'}
             <ArrowRight size={17} />
           </button>
+          <p className="authSwitch">
+            New to Wear It? <Link href="/register">Create an account</Link>
+          </p>
         </form>
       </section>
     </main>
