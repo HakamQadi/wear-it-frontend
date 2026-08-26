@@ -3,17 +3,23 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowRight, Shirt } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Shirt } from 'lucide-react';
+import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { ErrorNote } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, user, ready } = useAuth();
+  const { t, dir } = useI18n();
+  const describeError = useErrorMessage();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const Forward = dir === 'rtl' ? ArrowLeft : ArrowRight;
 
   useEffect(() => {
     if (ready && user) router.replace(user.role === 'admin' ? '/admin' : '/closet');
@@ -27,7 +33,7 @@ export default function LoginPage() {
       const profile = await login(form.email.trim(), form.password);
       router.replace(profile.role === 'admin' ? '/admin' : '/closet');
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not sign in.');
+      setError(describeError(caught, 'login.failed'));
       setBusy(false);
     }
   }
@@ -42,23 +48,27 @@ export default function LoginPage() {
           Wear It
         </Link>
         <div className="authQuote">
-          <h1>Everything you own, ready to try on.</h1>
-          <p>Sign in to open your virtual wardrobe, build an outfit and see it rendered on you.</p>
+          <h1>{t('login.visualTitle')}</h1>
+          <p>{t('login.visualText')}</p>
         </div>
-        <small>Your closet stays private to your account.</small>
+        <small>{t('login.visualNote')}</small>
       </section>
 
       <section className="authFormWrap">
         <form className="authCard" onSubmit={submit}>
-          <span className="eyebrow">Welcome back</span>
-          <h2>Sign in.</h2>
-          <p>Use the email you signed up with.</p>
+          <div className="authTop">
+            <span className="eyebrow">{t('login.eyebrow')}</span>
+            <LanguageSwitch compact />
+          </div>
+          <h2>{t('login.title')}</h2>
+          <p>{t('login.subtitle')}</p>
 
           <label className="formField">
-            <span>Email</span>
+            <span>{t('common.email')}</span>
             <input
               className="input"
               type="email"
+              dir="ltr"
               required
               autoComplete="email"
               value={form.email}
@@ -66,10 +76,11 @@ export default function LoginPage() {
             />
           </label>
           <label className="formField">
-            <span>Password</span>
+            <span>{t('common.password')}</span>
             <input
               className="input"
               type="password"
+              dir="ltr"
               required
               autoComplete="current-password"
               value={form.password}
@@ -79,11 +90,11 @@ export default function LoginPage() {
 
           <ErrorNote message={error} />
           <button className="button" type="submit" disabled={busy}>
-            {busy ? 'Signing in…' : 'Sign in'}
-            <ArrowRight size={17} />
+            {busy ? t('login.submitting') : t('common.signIn')}
+            <Forward size={17} />
           </button>
           <p className="authSwitch">
-            New to Wear It? <Link href="/register">Create an account</Link>
+            {t('login.noAccount')} <Link href="/register">{t('login.createAccount')}</Link>
           </p>
         </form>
       </section>

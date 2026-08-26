@@ -9,15 +9,16 @@ import { Header } from '@/components/Header';
 import { MemberGuard } from '@/components/MemberGuard';
 import { EmptyState, ErrorNote, LoadingState } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError, api, mediaUrl } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { api, mediaUrl } from '@/lib/api';
+import { lookTypeName } from '@/lib/localise';
 import type { Look } from '@/lib/types';
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 function LooksContent() {
   const { token } = useAuth();
+  const { t, locale, tag } = useI18n();
+  const describeError = useErrorMessage();
   const [looks, setLooks] = useState<Look[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,25 +29,28 @@ function LooksContent() {
       setLooks(await api<Look[]>('/looks', {}, token));
       setError('');
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not load your looks.');
+      setError(describeError(caught, 'looks.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, describeError]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   async function remove(look: Look) {
-    if (!window.confirm('Delete this look? The generated image is removed for good.')) return;
+    if (!window.confirm(t('looks.confirmDelete'))) return;
     try {
       await api(`/looks/${look._id}`, { method: 'DELETE' }, token);
       await load();
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not delete the look.');
+      setError(describeError(caught, 'looks.deleteFailed'));
     }
   }
+
+  const formatDate = (value: string) =>
+    new Intl.DateTimeFormat(tag, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
 
   return (
     <>
@@ -55,20 +59,20 @@ function LooksContent() {
         <div className="container">
           <section className="pageHead">
             <div>
-              <span className="eyebrow">My looks</span>
-              <h1>Outfits you have tried on.</h1>
-              <p className="muted">Every look keeps the pieces it was built from, even if you later remove them from your closet.</p>
+              <span className="eyebrow">{t('looks.eyebrow')}</span>
+              <h1>{t('looks.title')}</h1>
+              <p className="muted">{t('looks.subtitle')}</p>
             </div>
             <Link href="/studio" className="button">
               <Sparkles size={17} />
-              Create a look
+              {t('looks.createLook')}
             </Link>
           </section>
 
           <ErrorNote message={error} />
 
           {loading ? (
-            <LoadingState label="Loading your looks" />
+            <LoadingState label={t('looks.loading')} />
           ) : looks.length ? (
             <div className="lookGrid">
               {looks.map((look) => (
@@ -77,7 +81,7 @@ function LooksContent() {
                     {look.status === 'ready' && look.resultImageUrl ? (
                       <Image
                         src={mediaUrl(look.resultImageUrl)}
-                        alt={`Look with ${look.items.map((item) => item.name).join(', ')}`}
+                        alt={t('looks.lookAlt', { items: look.items.map((item) => item.name).join('، ') })}
                         fill
                         unoptimized
                         sizes="(max-width:700px) 100vw, 33vw"
@@ -85,13 +89,13 @@ function LooksContent() {
                     ) : (
                       <div className="lookFailed">
                         <TriangleAlert size={22} />
-                        <strong>Generation failed</strong>
-                        <small>{look.errorMessage || 'The image service could not complete this look.'}</small>
+                        <strong>{t('looks.failedTitle')}</strong>
+                        <small>{look.errorMessage || t('looks.failedText')}</small>
                       </div>
                     )}
                   </div>
                   <div className="lookBody">
-                    <strong>{look.items.map((item) => item.typeName).join(' + ')}</strong>
+                    <strong>{look.items.map((item) => lookTypeName(item, locale)).join(' + ')}</strong>
                     <small>{formatDate(look.createdAt)}</small>
                     <ul className="lookItems">
                       {look.items.map((item) => (
@@ -104,7 +108,7 @@ function LooksContent() {
                       ))}
                     </ul>
                     <button className="linkButton danger" onClick={() => remove(look)}>
-                      <Trash2 size={12} /> Delete look
+                      <Trash2 size={12} /> {t('looks.deleteLook')}
                     </button>
                   </div>
                 </article>
@@ -112,12 +116,12 @@ function LooksContent() {
             </div>
           ) : (
             <EmptyState
-              title="No looks yet"
-              text="Combine a few closet items in the studio and your generated outfits will collect here."
+              title={t('looks.emptyTitle')}
+              text={t('looks.emptyText')}
               action={
                 <Link className="button" href="/studio">
                   <Sparkles size={17} />
-                  Open the studio
+                  {t('looks.openStudio')}
                 </Link>
               }
             />

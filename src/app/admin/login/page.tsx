@@ -3,17 +3,24 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowRight, LockKeyhole, Shirt } from 'lucide-react';
+import { ArrowLeft, ArrowRight, LockKeyhole, Shirt } from 'lucide-react';
+import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { ErrorNote } from '@/components/StateViews';
-import { ApiError, api } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { api } from '@/lib/api';
 import { adminSession } from '@/lib/auth';
 import type { AuthResponse, SessionUser } from '@/lib/types';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 export default function AdminLogin() {
   const router = useRouter();
+  const { t, dir } = useI18n();
+  const describeError = useErrorMessage();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const Forward = dir === 'rtl' ? ArrowLeft : ArrowRight;
 
   useEffect(() => {
     const token = adminSession.get();
@@ -33,14 +40,14 @@ export default function AdminLogin() {
         body: JSON.stringify({ email: form.email.trim(), password: form.password }),
       });
       if (session.user.role !== 'admin') {
-        setError('This account is not an administrator.');
+        setError(t('admin.notAdmin'));
         setBusy(false);
         return;
       }
       adminSession.set(session.accessToken);
       router.replace('/admin');
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not sign in.');
+      setError(describeError(caught, 'login.failed'));
       setBusy(false);
     }
   }
@@ -55,23 +62,27 @@ export default function AdminLogin() {
           Wear It
         </Link>
         <div className="authQuote">
-          <h1>Run the wardrobe taxonomy.</h1>
-          <p>Manage the clothing types every member picks from, review closet activity and edit the site copy.</p>
+          <h1>{t('admin.loginVisualTitle')}</h1>
+          <p>{t('admin.loginVisualText')}</p>
         </div>
-        <small>Wear It closet CMS</small>
+        <small>{t('admin.loginVisualNote')}</small>
       </section>
 
       <section className="authFormWrap">
         <form className="authCard" onSubmit={submit}>
-          <span className="eyebrow">Admin access</span>
-          <h2>Sign in.</h2>
-          <p>Administrator accounts only.</p>
+          <div className="authTop">
+            <span className="eyebrow">{t('admin.loginEyebrow')}</span>
+            <LanguageSwitch compact />
+          </div>
+          <h2>{t('admin.loginTitle')}</h2>
+          <p>{t('admin.loginSubtitle')}</p>
 
           <label className="formField">
-            <span>Email</span>
+            <span>{t('common.email')}</span>
             <input
               className="input"
               type="email"
+              dir="ltr"
               required
               autoComplete="email"
               value={form.email}
@@ -79,10 +90,11 @@ export default function AdminLogin() {
             />
           </label>
           <label className="formField">
-            <span>Password</span>
+            <span>{t('common.password')}</span>
             <input
               className="input"
               type="password"
+              dir="ltr"
               required
               autoComplete="current-password"
               value={form.password}
@@ -93,8 +105,8 @@ export default function AdminLogin() {
           <ErrorNote message={error} />
           <button className="button" type="submit" disabled={busy}>
             <LockKeyhole size={17} />
-            {busy ? 'Signing in…' : 'Sign in'}
-            <ArrowRight size={17} />
+            {busy ? t('login.submitting') : t('common.signIn')}
+            <Forward size={17} />
           </button>
         </form>
       </section>

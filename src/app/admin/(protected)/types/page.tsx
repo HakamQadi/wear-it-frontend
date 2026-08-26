@@ -3,13 +3,16 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { ErrorNote, LoadingState } from '@/components/StateViews';
-import { ApiError, api } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { api } from '@/lib/api';
 import { adminSession } from '@/lib/auth';
+import { typeName } from '@/lib/localise';
 import type { ClothingType, TypeUsage } from '@/lib/types';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
-type TypeForm = { name: string; slug: string; description: string; sortOrder: number; isActive: boolean };
+type TypeForm = { name: string; nameAr: string; slug: string; description: string; sortOrder: number; isActive: boolean };
 
-const EMPTY: TypeForm = { name: '', slug: '', description: '', sortOrder: 0, isActive: true };
+const EMPTY: TypeForm = { name: '', nameAr: '', slug: '', description: '', sortOrder: 0, isActive: true };
 
 // Browsers compile the `pattern` attribute with the unicode-sets flag, where an unescaped
 // "-" at the end of a character class is a syntax error.
@@ -23,6 +26,8 @@ const slugify = (value: string) =>
     .replace(/^-|-$/g, '');
 
 export default function ClothingTypesAdmin() {
+  const { t, locale, tag } = useI18n();
+  const describeError = useErrorMessage();
   const [rows, setRows] = useState<TypeUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,15 +43,17 @@ export default function ClothingTypesAdmin() {
       setRows(await api<TypeUsage[]>('/admin/type-usage', {}, adminSession.get()));
       setError('');
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not load clothing types.');
+      setError(describeError(caught, 'admin.typesLoadFailed'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [describeError]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const number = (value: number) => new Intl.NumberFormat(tag).format(value);
 
   function startCreate() {
     setEditing(null);
@@ -63,6 +70,7 @@ export default function ClothingTypesAdmin() {
       setEditing(row);
       setForm({
         name: match?.name ?? row.name,
+        nameAr: match?.nameAr ?? row.nameAr ?? '',
         slug: match?.slug ?? row.slug,
         description: match?.description ?? '',
         sortOrder: match?.sortOrder ?? row.sortOrder,
@@ -70,7 +78,7 @@ export default function ClothingTypesAdmin() {
       });
       setOpen(true);
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not open this type.');
+      setError(describeError(caught, 'admin.typeOpenFailed'));
     }
   }
 
@@ -85,19 +93,19 @@ export default function ClothingTypesAdmin() {
       setOpen(false);
       await load();
     } catch (caught: unknown) {
-      setFormError(caught instanceof ApiError ? caught.message : 'Could not save this type.');
+      setFormError(describeError(caught, 'admin.typeSaveFailed'));
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(row: TypeUsage) {
-    if (!window.confirm(`Delete "${row.name}"? Hide it instead if members still use it.`)) return;
+    if (!window.confirm(t('admin.confirmDeleteType', { name: typeName(row, locale) }))) return;
     try {
       await api(`/clothing-types/${row._id}`, { method: 'DELETE' }, adminSession.get());
       await load();
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not delete this type.');
+      setError(describeError(caught, 'admin.typeDeleteFailed'));
     }
   }
 
@@ -105,12 +113,12 @@ export default function ClothingTypesAdmin() {
     <>
       <div className="adminTop">
         <div>
-          <h1>Clothing types</h1>
-          <p>The wardrobe categories every member picks from. Adding one needs no code change.</p>
+          <h1>{t('admin.typesTitle')}</h1>
+          <p>{t('admin.typesSubtitle')}</p>
         </div>
         <button className="button sm" onClick={startCreate}>
           <Plus size={15} />
-          Add type
+          {t('admin.addType')}
         </button>
       </div>
 
@@ -118,17 +126,17 @@ export default function ClothingTypesAdmin() {
 
       <section className="adminPanel">
         {loading ? (
-          <LoadingState label="Loading clothing types" />
+          <LoadingState />
         ) : (
           <div className="adminTableWrap">
             <table className="adminTable">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Slug</th>
-                  <th>Order</th>
-                  <th>Items in use</th>
-                  <th>Status</th>
+                  <th>{t('admin.colName')}</th>
+                  <th>{t('admin.colSlug')}</th>
+                  <th>{t('admin.colOrder')}</th>
+                  <th>{t('admin.colItemsInUse')}</th>
+                  <th>{t('admin.colStatus')}</th>
                   <th />
                 </tr>
               </thead>
@@ -136,24 +144,28 @@ export default function ClothingTypesAdmin() {
                 {rows.map((row) => (
                   <tr key={row._id}>
                     <td>
-                      <strong>{row.name}</strong>
+                      <strong>{typeName(row, locale)}</strong>
                     </td>
-                    <td className="muted">/{row.slug}</td>
-                    <td>{row.sortOrder}</td>
-                    <td>{row.itemCount}</td>
+                    <td className="muted" dir="ltr">
+                      /{row.slug}
+                    </td>
+                    <td>{number(row.sortOrder)}</td>
+                    <td>{number(row.itemCount)}</td>
                     <td>
-                      <span className={`status ${row.isActive ? 'active' : ''}`}>{row.isActive ? 'Visible' : 'Hidden'}</span>
+                      <span className={`status ${row.isActive ? 'active' : ''}`}>
+                        {t(row.isActive ? 'admin.statusVisible' : 'admin.statusHidden')}
+                      </span>
                     </td>
                     <td>
                       <div className="rowActions">
-                        <button aria-label={`Edit ${row.name}`} onClick={() => startEdit(row)}>
+                        <button aria-label={t('closet.editAria', { name: typeName(row, locale) })} onClick={() => startEdit(row)}>
                           <Pencil size={14} />
                         </button>
                         <button
-                          aria-label={`Delete ${row.name}`}
+                          aria-label={t('closet.deleteAria', { name: typeName(row, locale) })}
                           onClick={() => remove(row)}
                           disabled={row.itemCount > 0}
-                          title={row.itemCount > 0 ? 'Members still use this type — hide it instead' : 'Delete'}
+                          title={row.itemCount > 0 ? t('admin.deleteBlocked') : t('common.delete')}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -164,7 +176,7 @@ export default function ClothingTypesAdmin() {
                 {rows.length === 0 && (
                   <tr>
                     <td colSpan={6} className="muted">
-                      No clothing types yet. Add the first one.
+                      {t('admin.noTypesAddFirst')}
                     </td>
                   </tr>
                 )}
@@ -178,16 +190,17 @@ export default function ClothingTypesAdmin() {
         <div className="modalBackdrop" role="dialog" aria-modal="true">
           <div className="modal" style={{ maxWidth: 560 }}>
             <div className="modalHeader">
-              <h3>{editing ? 'Edit clothing type' : 'New clothing type'}</h3>
-              <button aria-label="Close" onClick={() => setOpen(false)}>
+              <h3>{t(editing ? 'admin.editType' : 'admin.newType')}</h3>
+              <button aria-label={t('common.close')} onClick={() => setOpen(false)}>
                 <X />
               </button>
             </div>
             <form className="adminForm" onSubmit={save}>
               <label className="formField">
-                <span>Name</span>
+                <span>{t('admin.typeNameEn')}</span>
                 <input
                   className="input"
+                  dir="ltr"
                   required
                   minLength={2}
                   maxLength={60}
@@ -202,9 +215,20 @@ export default function ClothingTypesAdmin() {
                 />
               </label>
               <label className="formField">
-                <span>Slug</span>
+                <span>{t('admin.typeNameAr')}</span>
                 <input
                   className="input"
+                  dir="rtl"
+                  maxLength={60}
+                  value={form.nameAr}
+                  onChange={(event) => setForm({ ...form, nameAr: event.target.value })}
+                />
+              </label>
+              <label className="formField">
+                <span>{t('admin.typeSlug')}</span>
+                <input
+                  className="input"
+                  dir="ltr"
                   required
                   pattern={SLUG_PATTERN}
                   maxLength={60}
@@ -213,7 +237,7 @@ export default function ClothingTypesAdmin() {
                 />
               </label>
               <label className="formField">
-                <span>Layer order</span>
+                <span>{t('admin.typeOrder')}</span>
                 <input
                   className="input"
                   type="number"
@@ -221,7 +245,7 @@ export default function ClothingTypesAdmin() {
                   value={form.sortOrder}
                   onChange={(event) => setForm({ ...form, sortOrder: Number(event.target.value) })}
                 />
-                <small className="fieldHint">Lower numbers are worn closer to the body.</small>
+                <small className="fieldHint">{t('admin.typeOrderHint')}</small>
               </label>
               <label className="checkboxLine">
                 <input
@@ -229,10 +253,10 @@ export default function ClothingTypesAdmin() {
                   checked={form.isActive}
                   onChange={(event) => setForm({ ...form, isActive: event.target.checked })}
                 />
-                Visible to members
+                {t('admin.typeVisible')}
               </label>
               <label className="formField full">
-                <span>Description</span>
+                <span>{t('admin.typeDescription')}</span>
                 <textarea
                   className="textarea"
                   maxLength={400}
@@ -243,10 +267,10 @@ export default function ClothingTypesAdmin() {
               {formError && <ErrorNote message={formError} />}
               <div className="formActions">
                 <button type="button" className="button secondary sm" onClick={() => setOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button className="button sm" disabled={saving}>
-                  {saving ? 'Saving…' : 'Save type'}
+                  {saving ? t('closet.saving') : t('admin.saveType')}
                 </button>
               </div>
             </form>

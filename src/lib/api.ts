@@ -13,6 +13,10 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** Stable identifier for business errors, used to show a translated message. */
+    readonly code?: string,
+    /** Values a translated sentence interpolates, e.g. the clashing clothing type. */
+    readonly params?: Record<string, string | number>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -29,13 +33,23 @@ export async function api<T>(path: string, init: RequestInit = {}, token?: strin
   try {
     response = await fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' });
   } catch {
+    // Status 0 means the request never completed; the caller decides how to recover.
     throw new ApiError('Could not reach the Wear It service. Check your connection and try again.', 0);
   }
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+    const payload = (await response.json().catch(() => null)) as {
+      message?: string | string[];
+      code?: string;
+      params?: Record<string, string | number>;
+    } | null;
     const message = Array.isArray(payload?.message) ? payload?.message.join(', ') : payload?.message;
-    throw new ApiError(message || `Request failed (${response.status})`, response.status);
+    throw new ApiError(
+      message || `Request failed (${response.status})`,
+      response.status,
+      payload?.code,
+      payload?.params,
+    );
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;

@@ -3,19 +3,25 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { ArrowRight, Shirt } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Shirt } from 'lucide-react';
+import { LanguageSwitch } from '@/components/LanguageSwitch';
 import { ErrorNote } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 const MIN_PASSWORD = 8;
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register, user, ready } = useAuth();
+  const { t, dir } = useI18n();
+  const describeError = useErrorMessage();
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const Forward = dir === 'rtl' ? ArrowLeft : ArrowRight;
 
   useEffect(() => {
     if (ready && user) router.replace(user.role === 'admin' ? '/admin' : '/closet');
@@ -29,7 +35,7 @@ export default function RegisterPage() {
       await register(form.name.trim(), form.email.trim(), form.password);
       router.replace('/closet');
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not create your account.');
+      setError(describeError(caught, 'register.failed'));
       setBusy(false);
     }
   }
@@ -44,20 +50,23 @@ export default function RegisterPage() {
           Wear It
         </Link>
         <div className="authQuote">
-          <h1>Turn your closet into a wardrobe you can browse.</h1>
-          <p>Photograph each piece once, then combine outfits and preview them on yourself whenever you want.</p>
+          <h1>{t('register.visualTitle')}</h1>
+          <p>{t('register.visualText')}</p>
         </div>
-        <small>Free while Wear It is in preview.</small>
+        <small>{t('register.visualNote')}</small>
       </section>
 
       <section className="authFormWrap">
         <form className="authCard" onSubmit={submit}>
-          <span className="eyebrow">Create your closet</span>
-          <h2>Get started.</h2>
-          <p>It takes a minute, and your first item can go in right after.</p>
+          <div className="authTop">
+            <span className="eyebrow">{t('register.eyebrow')}</span>
+            <LanguageSwitch compact />
+          </div>
+          <h2>{t('register.title')}</h2>
+          <p>{t('register.subtitle')}</p>
 
           <label className="formField">
-            <span>Name</span>
+            <span>{t('common.name')}</span>
             <input
               className="input"
               required
@@ -69,10 +78,11 @@ export default function RegisterPage() {
             />
           </label>
           <label className="formField">
-            <span>Email</span>
+            <span>{t('common.email')}</span>
             <input
               className="input"
               type="email"
+              dir="ltr"
               required
               autoComplete="email"
               value={form.email}
@@ -80,10 +90,11 @@ export default function RegisterPage() {
             />
           </label>
           <label className="formField">
-            <span>Password</span>
+            <span>{t('common.password')}</span>
             <input
               className="input"
               type="password"
+              dir="ltr"
               required
               minLength={MIN_PASSWORD}
               maxLength={72}
@@ -91,16 +102,16 @@ export default function RegisterPage() {
               value={form.password}
               onChange={(event) => setForm({ ...form, password: event.target.value })}
             />
-            <small className="fieldHint">At least {MIN_PASSWORD} characters.</small>
+            <small className="fieldHint">{t('register.passwordHint')}</small>
           </label>
 
           <ErrorNote message={error} />
           <button className="button" type="submit" disabled={busy}>
-            {busy ? 'Creating your closet…' : 'Create account'}
-            <ArrowRight size={17} />
+            {busy ? t('register.submitting') : t('register.submit')}
+            <Forward size={17} />
           </button>
           <p className="authSwitch">
-            Already have an account? <Link href="/login">Sign in</Link>
+            {t('register.haveAccount')} <Link href="/login">{t('common.signIn')}</Link>
           </p>
         </form>
       </section>

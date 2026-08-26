@@ -3,11 +3,13 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import { LoadingState } from './StateViews';
 
 /** Keeps closet, studio, looks and photos behind a member session. */
 export function MemberGuard({ children }: { children: React.ReactNode }) {
   const { user, ready } = useAuth();
+  const { t } = useI18n();
   const router = useRouter();
   const [wasSignedIn, setWasSignedIn] = useState(false);
 
@@ -22,7 +24,7 @@ export function MemberGuard({ children }: { children: React.ReactNode }) {
     if (!wasSignedIn) router.replace('/login');
   }, [ready, user, wasSignedIn, router]);
 
-  if (!ready) return <LoadingState label="Opening your closet" />;
-  if (!user) return <LoadingState label={wasSignedIn ? 'Signing out' : 'Redirecting to sign in'} />;
+  if (!ready) return <LoadingState label={t('guard.openingCloset')} />;
+  if (!user) return <LoadingState label={t(wasSignedIn ? 'guard.signingOut' : 'guard.redirecting')} />;
   return <>{children}</>;
 }

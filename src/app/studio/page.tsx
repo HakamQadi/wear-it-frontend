@@ -10,13 +10,18 @@ import { ImageDrop } from '@/components/ImageDrop';
 import { MemberGuard } from '@/components/MemberGuard';
 import { EmptyState, ErrorNote, LoadingState } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/context/I18nContext';
 import { ApiError, api, mediaUrl } from '@/lib/api';
+import { lookTypeName, typeName } from '@/lib/localise';
 import { MAX_LOOK_ITEMS, type ClothingType, type Look, type UserPhoto, type WardrobeItem } from '@/lib/types';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 const MAX_DIRECTION = 600;
 
 function StudioContent() {
   const { token } = useAuth();
+  const { t, locale, tag } = useI18n();
+  const describeError = useErrorMessage();
   const [types, setTypes] = useState<ClothingType[]>([]);
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
@@ -62,13 +67,13 @@ function StudioContent() {
         setPhotoId(loadedPhotos.find((photo) => photo.isDefault)?._id ?? loadedPhotos[0]?._id ?? '');
       })
       .catch((caught: unknown) => {
-        if (active) setError(caught instanceof ApiError ? caught.message : 'Could not open the studio.');
+        if (active) setError(describeError(caught, 'studio.openFailed'));
       })
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
     };
-  }, [token, loadPhotos]);
+  }, [token, loadPhotos, describeError]);
 
   /** Wardrobe items bucketed by clothing type, in the CMS layering order. */
   const groups = useMemo(() => {
@@ -115,7 +120,7 @@ function StudioContent() {
       setPhotoId(saved._id);
       setAddingPhoto(false);
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not save the photo.');
+      setError(describeError(caught, 'studio.savePhotoFailed'));
     }
   }
 
@@ -179,20 +184,16 @@ function StudioContent() {
       const mayStillArrive = status === 429 || status === 0 || status >= 500;
 
       if (mayStillArrive) {
-        setNotice(
-          status === 429
-            ? 'Your previous look is still being created. Waiting for it to finish…'
-            : 'The connection dropped, but your look is still being created. Waiting for it…',
-        );
+        setNotice(t(status === 429 ? 'studio.stillRunning' : 'studio.connectionDropped'));
         const pending = await waitForPendingLook(knownIds);
         setNotice('');
         if (pending) {
           setResult(pending);
         } else {
-          setError('That look is taking longer than usual. It will appear in My looks when it is ready.');
+          setError(t('studio.takingLong'));
         }
       } else {
-        setError(caught instanceof ApiError ? caught.message : 'Could not generate this look.');
+        setError(describeError(caught, 'studio.generateFailed'));
       }
     } finally {
       inFlight.current = false;
@@ -208,7 +209,7 @@ function StudioContent() {
     return (
       <>
         <Header />
-        <LoadingState label="Opening the outfit studio" />
+        <LoadingState label={t('studio.loading')} />
         <Footer />
       </>
     );
@@ -221,27 +222,24 @@ function StudioContent() {
         <div className="container">
           <section className="pageHead">
             <div>
-              <span className="eyebrow">Outfit studio</span>
-              <h1>Build a look, then wear it.</h1>
-              <p className="muted">
-                Pick one item per clothing type — up to {MAX_LOOK_ITEMS} — choose a photo of yourself, and Wear It renders the
-                whole outfit on you.
-              </p>
+              <span className="eyebrow">{t('studio.eyebrow')}</span>
+              <h1>{t('studio.title')}</h1>
+              <p className="muted">{t('studio.subtitle', { max: new Intl.NumberFormat(tag).format(MAX_LOOK_ITEMS) })}</p>
             </div>
           </section>
 
           {!aiConfigured && (
-            <ErrorNote message="AI look generation is not configured on this server yet. Selections are saved but generation will fail." />
+            <ErrorNote message={t('studio.aiNotConfigured')} />
           )}
 
           {items.length === 0 ? (
             <EmptyState
-              title="Your closet is empty"
-              text="Add a few pieces to your wardrobe and they will show up here, grouped by clothing type."
+              title={t('studio.emptyTitle')}
+              text={t('studio.emptyText')}
               action={
                 <Link className="button" href="/closet">
                   <Plus size={17} />
-                  Add closet items
+                  {t('studio.addItems')}
                 </Link>
               }
             />
@@ -254,8 +252,12 @@ function StudioContent() {
                   return (
                     <section className="typeGroup" key={typeId}>
                       <header>
-                        <h3>{group.type!.name}</h3>
-                        <small>{chosen ? '1 selected' : `${group.items.length} available`}</small>
+                        <h3>{typeName(group.type, locale)}</h3>
+                        <small>
+                          {chosen
+                            ? t('studio.selected')
+                            : t('studio.available', { count: new Intl.NumberFormat(tag).format(group.items.length) })}
+                        </small>
                       </header>
                       <div className="typeRow">
                         {group.items.map((item) => {
@@ -268,7 +270,11 @@ function StudioContent() {
                               className={`pickTile ${isSelected ? 'selected' : ''}`}
                               onClick={() => toggle(item)}
                               disabled={blocked}
-                              title={blocked ? `A look can hold at most ${MAX_LOOK_ITEMS} items` : item.name}
+                              title={
+                                blocked
+                                  ? t('studio.atLimit', { max: new Intl.NumberFormat(tag).format(MAX_LOOK_ITEMS) })
+                                  : item.name
+                              }
                               aria-pressed={isSelected}
                             >
                               <Image src={mediaUrl(item.imageUrl)} alt={item.name} fill unoptimized sizes="140px" />
@@ -288,9 +294,9 @@ function StudioContent() {
               </div>
 
               <aside className="studioPanel">
-                <h3>Your look</h3>
+                <h3>{t('studio.yourLook')}</h3>
                 {selectedItems.length === 0 ? (
-                  <p className="panelHint">Nothing picked yet. Choose one item from any clothing type to start.</p>
+                  <p className="panelHint">{t('studio.nothingPicked')}</p>
                 ) : (
                   <ul className="selectionList">
                     {selectedItems.map((item) => (
@@ -300,20 +306,20 @@ function StudioContent() {
                         </span>
                         <span className="selectionText">
                           <strong>{item.name}</strong>
-                          <small>{item.typeId?.name}</small>
+                          <small>{typeName(item.typeId, locale)}</small>
                         </span>
-                        <button aria-label={`Remove ${item.name}`} onClick={() => toggle(item)}>
+                        <button aria-label={t('studio.removeAria', { name: item.name })} onClick={() => toggle(item)}>
                           <X size={14} />
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
-                <p className="panelRule">One item per clothing type. Picking another swaps the current one.</p>
+                <p className="panelRule">{t('studio.onePerType')}</p>
 
-                <h3 className="panelSection">Your photo</h3>
+                <h3 className="panelSection">{t('studio.yourPhoto')}</h3>
                 {photos.length === 0 && !addingPhoto && (
-                  <p className="panelHint">Add a photo of yourself to generate a look.</p>
+                  <p className="panelHint">{t('studio.needPhoto')}</p>
                 )}
                 {photos.length > 0 && (
                   <div className="photoStrip">
@@ -324,31 +330,31 @@ function StudioContent() {
                         className={`photoTile ${photoId === photo._id ? 'selected' : ''}`}
                         onClick={() => setPhotoId(photo._id)}
                         aria-pressed={photoId === photo._id}
-                        title={photo.label || 'Saved photo'}
+                        title={photo.label || t('photos.untitled')}
                       >
-                        <Image src={mediaUrl(photo.imageUrl)} alt={photo.label || 'Saved photo'} fill unoptimized sizes="70px" />
+                        <Image src={mediaUrl(photo.imageUrl)} alt={photo.label || t('photos.untitled')} fill unoptimized sizes="70px" />
                       </button>
                     ))}
                   </div>
                 )}
                 {addingPhoto ? (
-                  <ImageDrop label="New photo" value="" token={token} onChange={savePhoto} onError={setError} />
+                  <ImageDrop label={t('studio.newPhoto')} value="" token={token} onChange={savePhoto} onError={setError} />
                 ) : (
                   <button className="button secondary sm fullWidth" onClick={() => setAddingPhoto(true)}>
                     <ImagePlus size={15} />
-                    Upload a new photo
+                    {t('studio.uploadNewPhoto')}
                   </button>
                 )}
 
                 <label className="formField panelSection">
                   <span>
-                    Extra direction <em>optional</em>
+                    {t('studio.extraDirection')} <em>{t('common.optional')}</em>
                   </span>
                   <textarea
                     className="textarea"
                     maxLength={MAX_DIRECTION}
                     value={direction}
-                    placeholder="Keep my pose and background, relaxed fit."
+                    placeholder={t('studio.directionPlaceholder')}
                     onChange={(event) => setDirection(event.target.value)}
                   />
                   <small className="fieldHint">
@@ -360,14 +366,13 @@ function StudioContent() {
                 <ErrorNote message={error} />
                 <button className="button fullWidth" onClick={generate} disabled={!canGenerate}>
                   {generating ? <LoaderCircle className="spin" size={17} /> : <Sparkles size={17} />}
-                  {generating ? 'Generating…' : 'Generate my look'}
+                  {generating ? t('studio.generating') : t('studio.generate')}
                 </button>
-                {!photoId && photos.length > 0 && <p className="panelHint">Pick one of your photos first.</p>}
+                {!photoId && photos.length > 0 && <p className="panelHint">{t('studio.pickPhoto')}</p>}
 
                 <p className="privacyNote">
                   <LockKeyhole size={14} />
-                  Your photo and the selected items are sent to the AI image service only when you generate. Everything stays in
-                  your account.
+                  {t('studio.privacy')}
                 </p>
               </aside>
             </div>
@@ -379,29 +384,29 @@ function StudioContent() {
                 {generating && (
                   <div className="resultOverlay" role="status" aria-live="polite">
                     <LoaderCircle className="spin" size={34} />
-                    <strong>Rendering your outfit…</strong>
-                    <span>This can take up to a minute.</span>
+                    <strong>{t('studio.renderingTitle')}</strong>
+                    <span>{t('studio.renderingNote')}</span>
                   </div>
                 )}
                 {result?.resultImageUrl ? (
-                  <Image src={mediaUrl(result.resultImageUrl)} alt="Your generated look" fill unoptimized className="resultImage" />
+                  <Image src={mediaUrl(result.resultImageUrl)} alt={t('studio.resultEyebrow')} fill unoptimized className="resultImage" />
                 ) : selectedPhoto ? (
                   <Image src={mediaUrl(selectedPhoto.imageUrl)} alt="" fill unoptimized className="resultImage dim" />
                 ) : null}
               </div>
               {result && (
                 <div className="resultMeta">
-                  <span className="eyebrow">Generated look</span>
-                  <h3>{result.items.map((item) => item.typeName).join(' + ')}</h3>
+                  <span className="eyebrow">{t('studio.resultEyebrow')}</span>
+                  <h3>{result.items.map((item) => lookTypeName(item, locale)).join(' + ')}</h3>
                   <ul>
                     {result.items.map((item) => (
                       <li key={item.itemId}>
-                        <strong>{item.typeName}</strong> — {item.name}
+                        <strong>{lookTypeName(item, locale)}</strong> — {item.name}
                       </li>
                     ))}
                   </ul>
                   <Link href="/looks" className="button secondary sm">
-                    See all my looks
+                    {t('studio.seeAllLooks')}
                   </Link>
                 </div>
               )}

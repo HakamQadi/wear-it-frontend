@@ -5,22 +5,26 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogOut, Menu, Shirt, Sparkles, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n, type TranslationKey } from '@/context/I18nContext';
 import { api } from '@/lib/api';
+import { text } from '@/lib/localise';
 import type { SiteContent } from '@/lib/types';
+import { LanguageSwitch } from './LanguageSwitch';
 
-const MEMBER_LINKS = [
-  ['/closet', 'My closet'],
-  ['/studio', 'Outfit studio'],
-  ['/looks', 'My looks'],
-  ['/photos', 'My photos'],
-] as const;
+const MEMBER_LINKS: ReadonlyArray<readonly [string, TranslationKey]> = [
+  ['/closet', 'nav.closet'],
+  ['/studio', 'nav.studio'],
+  ['/looks', 'nav.looks'],
+  ['/photos', 'nav.photos'],
+];
 
 export function Header() {
   const { user, ready, logout } = useAuth();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const path = usePathname();
   const [open, setOpen] = useState(false);
-  const [content, setContent] = useState({ brandName: 'Wear It', announcement: '' });
+  const [content, setContent] = useState<Pick<SiteContent, 'brandName' | 'announcement'> | null>(null);
 
   useEffect(() => {
     api<SiteContent>('/content')
@@ -28,47 +32,56 @@ export function Header() {
       .catch(() => {});
   }, []);
 
+  const brand = text(content?.brandName, locale, 'Wear It');
+  const announcement = text(content?.announcement, locale, t('home.announcementDefault'));
+
   return (
     <>
-      {content.announcement && <div className="announcement">{content.announcement}</div>}
+      {announcement && <div className="announcement">{announcement}</div>}
       <header className="siteHeader">
-        <Link href={user ? '/closet' : '/'} className="brand" aria-label={`${content.brandName} home`}>
+        <Link href={user ? '/closet' : '/'} className="brand" aria-label={t('nav.home', { brand })}>
           <span className="brandDot">
             <Shirt size={17} />
           </span>
-          {content.brandName}
+          {brand}
         </Link>
 
         <nav className={`navLinks ${open ? 'navOpen' : ''}`}>
           {user ? (
-            MEMBER_LINKS.map(([href, label]) => (
+            MEMBER_LINKS.map(([href, key]) => (
               <Link key={href} href={href} className={path === href ? 'active' : ''} onClick={() => setOpen(false)}>
-                {label}
+                {t(key)}
               </Link>
             ))
           ) : (
             <>
               <Link href="/#how-it-works" onClick={() => setOpen(false)}>
-                How it works
+                {t('nav.howItWorks')}
               </Link>
               <Link href="/login" onClick={() => setOpen(false)}>
-                Sign in
+                {t('common.signIn')}
               </Link>
             </>
           )}
+          <span className="navLanguage">
+            <LanguageSwitch />
+          </span>
         </nav>
 
         <div className="headerActions">
+          <span className="desktopLanguage">
+            <LanguageSwitch compact />
+          </span>
           {!ready ? null : user ? (
             <>
-              <Link className="primaryPill" href="/studio" aria-label="Create a look">
+              <Link className="primaryPill" href="/studio" aria-label={t('nav.createLook')}>
                 <Sparkles size={16} />
-                <span className="pillLabel">Create a look</span>
+                <span className="pillLabel">{t('nav.createLook')}</span>
               </Link>
               <button
                 className="iconButton"
-                aria-label="Sign out"
-                title={`Sign out of ${user.email}`}
+                aria-label={t('common.signOut')}
+                title={t('nav.signOutOf', { email: user.email })}
                 onClick={() => {
                   logout();
                   router.replace('/');
@@ -79,10 +92,10 @@ export function Header() {
             </>
           ) : (
             <Link className="primaryPill" href="/register">
-              Get started
+              <span className="pillLabel">{t('nav.getStarted')}</span>
             </Link>
           )}
-          <button className="iconButton mobileMenu" aria-label="Toggle menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button className="iconButton mobileMenu" aria-label={t('nav.toggleMenu')} aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>

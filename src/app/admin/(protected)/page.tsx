@@ -2,13 +2,18 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Images, Shirt, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Images, Shirt, Sparkles, Users } from 'lucide-react';
 import { ErrorNote, LoadingState } from '@/components/StateViews';
-import { ApiError, api } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { api } from '@/lib/api';
 import { adminSession } from '@/lib/auth';
+import { typeName } from '@/lib/localise';
 import type { AdminStats, TypeUsage } from '@/lib/types';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 export default function AdminOverview() {
+  const { t, locale, dir, tag } = useI18n();
+  const describeError = useErrorMessage();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [usage, setUsage] = useState<TypeUsage[]>([]);
   const [error, setError] = useState('');
@@ -20,54 +25,58 @@ export default function AdminOverview() {
         setStats(loadedStats);
         setUsage(loadedUsage);
       })
-      .catch((caught: unknown) => setError(caught instanceof ApiError ? caught.message : 'Could not load the dashboard.'));
-  }, []);
+      .catch((caught: unknown) => setError(describeError(caught, 'admin.dashboardLoadFailed')));
+  }, [describeError]);
+
+  const Forward = dir === 'rtl' ? ArrowLeft : ArrowRight;
+  const number = (value: number) => new Intl.NumberFormat(tag).format(value);
 
   return (
     <>
       <div className="adminTop">
         <div>
-          <h1>Overview</h1>
-          <p>How members are using their virtual closets.</p>
+          <h1>{t('admin.overviewTitle')}</h1>
+          <p>{t('admin.overviewSubtitle')}</p>
         </div>
         <Link href="/admin/types" className="button sm">
-          Manage clothing types <ArrowRight size={14} />
+          {t('admin.manageTypes')} <Forward size={14} />
         </Link>
       </div>
 
       <ErrorNote message={error} />
 
       {!stats ? (
-        <LoadingState label="Loading dashboard" />
+        <LoadingState />
       ) : (
         <>
           <div className="statGrid">
             <div className="statCard">
-              <div className="statLabel">Members</div>
-              <div className="statValue">{stats.members}</div>
+              <div className="statLabel">{t('admin.statMembers')}</div>
+              <div className="statValue">{number(stats.members)}</div>
               <div className="statHint">
-                <Users size={11} /> Registered closets
+                <Users size={11} /> {t('admin.statMembersHint')}
               </div>
             </div>
             <div className="statCard">
-              <div className="statLabel">Wardrobe items</div>
-              <div className="statValue">{stats.items}</div>
+              <div className="statLabel">{t('admin.statItems')}</div>
+              <div className="statValue">{number(stats.items)}</div>
               <div className="statHint">
-                <Shirt size={11} /> Across all members
+                <Shirt size={11} /> {t('admin.statItemsHint')}
               </div>
             </div>
             <div className="statCard">
-              <div className="statLabel">Generated looks</div>
-              <div className="statValue">{stats.looks}</div>
+              <div className="statLabel">{t('admin.statLooks')}</div>
+              <div className="statValue">{number(stats.looks)}</div>
               <div className="statHint">
-                <Sparkles size={11} /> {stats.readyLooks} ready · {stats.failedLooks} failed
+                <Sparkles size={11} />{' '}
+                {t('admin.statLooksHint', { ready: number(stats.readyLooks), failed: number(stats.failedLooks) })}
               </div>
             </div>
             <div className="statCard">
-              <div className="statLabel">Personal photos</div>
-              <div className="statValue">{stats.photos}</div>
+              <div className="statLabel">{t('admin.statPhotos')}</div>
+              <div className="statValue">{number(stats.photos)}</div>
               <div className="statHint">
-                <Images size={11} /> Saved for reuse
+                <Images size={11} /> {t('admin.statPhotosHint')}
               </div>
             </div>
           </div>
@@ -75,44 +84,48 @@ export default function AdminOverview() {
           <section className="adminPanel">
             <div className="adminPanelHeader">
               <div>
-                <h3>Clothing types</h3>
+                <h3>{t('admin.typesPanelTitle')}</h3>
                 <p className="muted">
-                  {stats.activeTypes} of {stats.types} visible to members
+                  {t('admin.typesVisible', { active: number(stats.activeTypes), total: number(stats.types) })}
                 </p>
               </div>
               <Link href="/admin/types" className="textButton">
-                Manage
+                {t('admin.manage')}
               </Link>
             </div>
             <div className="adminTableWrap">
               <table className="adminTable">
                 <thead>
                   <tr>
-                    <th>Type</th>
-                    <th>Slug</th>
-                    <th>Order</th>
-                    <th>Items</th>
-                    <th>Status</th>
+                    <th>{t('admin.colType')}</th>
+                    <th>{t('admin.colSlug')}</th>
+                    <th>{t('admin.colOrder')}</th>
+                    <th>{t('admin.colItems')}</th>
+                    <th>{t('admin.colStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {usage.map((row) => (
                     <tr key={row._id}>
                       <td>
-                        <strong>{row.name}</strong>
+                        <strong>{typeName(row, locale)}</strong>
                       </td>
-                      <td className="muted">/{row.slug}</td>
-                      <td>{row.sortOrder}</td>
-                      <td>{row.itemCount}</td>
+                      <td className="muted" dir="ltr">
+                        /{row.slug}
+                      </td>
+                      <td>{number(row.sortOrder)}</td>
+                      <td>{number(row.itemCount)}</td>
                       <td>
-                        <span className={`status ${row.isActive ? 'active' : ''}`}>{row.isActive ? 'Visible' : 'Hidden'}</span>
+                        <span className={`status ${row.isActive ? 'active' : ''}`}>
+                          {t(row.isActive ? 'admin.statusVisible' : 'admin.statusHidden')}
+                        </span>
                       </td>
                     </tr>
                   ))}
                   {usage.length === 0 && (
                     <tr>
                       <td colSpan={5} className="muted">
-                        No clothing types yet.
+                        {t('admin.noTypes')}
                       </td>
                     </tr>
                   )}

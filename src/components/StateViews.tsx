@@ -1,10 +1,14 @@
-import { LoaderCircle, PackageSearch, TriangleAlert } from 'lucide-react';
+'use client';
 
-export function LoadingState({ label = 'Loading' }: { label?: string }) {
+import { LoaderCircle, PackageSearch, TriangleAlert } from 'lucide-react';
+import { useI18n } from '@/context/I18nContext';
+
+export function LoadingState({ label }: { label?: string }) {
+  const { t } = useI18n();
   return (
     <div className="stateView" role="status" aria-live="polite">
       <LoaderCircle className="spin" />
-      <p>{label}…</p>
+      <p>{label ?? t('common.loading')}…</p>
     </div>
   );
 }

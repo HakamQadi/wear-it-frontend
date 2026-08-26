@@ -10,11 +10,15 @@ import { ImageDrop } from '@/components/ImageDrop';
 import { MemberGuard } from '@/components/MemberGuard';
 import { EmptyState, ErrorNote, LoadingState } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError, api, mediaUrl } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { api, mediaUrl } from '@/lib/api';
 import type { UserPhoto } from '@/lib/types';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 function PhotosContent() {
   const { token } = useAuth();
+  const { t } = useI18n();
+  const describeError = useErrorMessage();
   const [photos, setPhotos] = useState<UserPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,11 +32,11 @@ function PhotosContent() {
       setPhotos(await api<UserPhoto[]>('/photos', {}, token));
       setError('');
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not load your photos.');
+      setError(describeError(caught, 'photos.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, describeError]);
 
   useEffect(() => {
     load();
@@ -49,7 +53,7 @@ function PhotosContent() {
       setLabel('');
       await load();
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not save the photo.');
+      setError(describeError(caught, 'photos.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -60,17 +64,17 @@ function PhotosContent() {
       await api(`/photos/${photo._id}`, { method: 'PATCH', body: JSON.stringify({ isDefault: true }) }, token);
       await load();
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not update the photo.');
+      setError(describeError(caught, 'photos.updateFailed'));
     }
   }
 
   async function remove(photo: UserPhoto) {
-    if (!window.confirm('Delete this photo? Looks already generated from it are kept.')) return;
+    if (!window.confirm(t('photos.confirmDelete'))) return;
     try {
       await api(`/photos/${photo._id}`, { method: 'DELETE' }, token);
       await load();
     } catch (caught: unknown) {
-      setError(caught instanceof ApiError ? caught.message : 'Could not delete the photo.');
+      setError(describeError(caught, 'photos.deleteFailed'));
     }
   }
 
@@ -81,67 +85,65 @@ function PhotosContent() {
         <div className="container">
           <section className="pageHead">
             <div>
-              <span className="eyebrow">My photos</span>
-              <h1>Photos of you.</h1>
-              <p className="muted">
-                Save a few clear, front-facing full-body photos once, then reuse them every time you build a look.
-              </p>
+              <span className="eyebrow">{t('photos.eyebrow')}</span>
+              <h1>{t('photos.title')}</h1>
+              <p className="muted">{t('photos.subtitle')}</p>
             </div>
             <Link href="/studio" className="button secondary">
               <Sparkles size={17} />
-              Create a look
+              {t('closet.createLook')}
             </Link>
           </section>
 
           <section className="uploadPanel">
             <ImageDrop
-              label="Add a photo"
-              hint="Front-facing, good light, full body if you can."
+              label={t('photos.addPhoto')}
+              hint={t('photos.addPhotoHint')}
               value={pending}
               token={token}
               onChange={savePending}
               onError={setError}
             />
             <label className="formField">
-              <span>Label (optional)</span>
+              <span>{t('photos.labelField')}</span>
               <input
                 className="input"
                 maxLength={80}
                 value={label}
-                placeholder="Standing, daylight"
+                placeholder={t('photos.labelPlaceholder')}
                 onChange={(event) => setLabel(event.target.value)}
                 disabled={saving}
               />
-              <small className="fieldHint">Set the label before choosing the photo — it is saved straight away.</small>
+              <small className="fieldHint">{t('photos.labelHint')}</small>
             </label>
           </section>
 
           <ErrorNote message={error} />
 
           {loading ? (
-            <LoadingState label="Loading your photos" />
+            <LoadingState label={t('photos.loading')} />
           ) : photos.length ? (
             <div className="photoGrid">
               {photos.map((photo) => (
                 <article className={`photoCard ${photo.isDefault ? 'isDefault' : ''}`} key={photo._id}>
                   <div className="photoImageWrap">
-                    <Image src={mediaUrl(photo.imageUrl)} alt={photo.label || 'Saved photo'} fill unoptimized sizes="240px" />
+                    <Image src={mediaUrl(photo.imageUrl)} alt={photo.label || t('photos.untitled')} fill unoptimized sizes="240px" />
                     {photo.isDefault && (
                       <span className="photoBadge">
-                        <Star size={12} /> Default
+                        <Star size={12} /> {t('photos.isDefault')}
                       </span>
                     )}
                   </div>
                   <div className="photoBody">
-                    <strong>{photo.label || 'Untitled photo'}</strong>
+                    <strong>{photo.label || t('photos.untitled')}</strong>
                     <div className="photoActions">
                       {!photo.isDefault && (
                         <button className="linkButton" onClick={() => makeDefault(photo)}>
-                          <Star size={12} /> Make default
+                          <Star size={12} /> {t('photos.makeDefault')}
                         </button>
                       )}
                       <button className="linkButton danger" onClick={() => remove(photo)}>
-                        <Trash2 size={12} /> Delete
+                        <Trash2 size={12} /> {t('common.delete')}
                       </button>
                     </div>
                   </div>
@@ -149,7 +151,7 @@ function PhotosContent() {
               ))}
             </div>
           ) : (
-            <EmptyState title="No photos yet" text="Add one photo of yourself and you can generate looks from it right away." />
+            <EmptyState title={t('photos.emptyTitle')} text={t('photos.emptyText')} />
           )}
         </div>
       </main>

@@ -160,6 +160,15 @@ async function run() {
   const files = makeImages();
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+  // This suite selects by visible English text, so the journey below runs with the
+  // language pinned. Arabic — the default — is checked separately at the end.
+  await context.addInitScript((key) => {
+    try {
+      window.localStorage.setItem(key, 'en');
+    } catch {
+      /* storage refused; the default locale still applies */
+    }
+  }, 'wear_it_locale');
   const page = await context.newPage();
   page.on('console', (message) => {
     if (message.type() === 'error' && !expectingRejection) consoleErrors.push(`${page.url()} :: ${message.text()}`);
@@ -407,7 +416,9 @@ async function run() {
 
   await page.getByRole('button', { name: 'Add type' }).click();
   await page.getByRole('dialog').waitFor();
-  await page.getByLabel('Name').fill(`QA Cape ${stamp}`);
+  // The dialog now carries a name per language.
+  await page.getByLabel('Name in English').fill(`QA Cape ${stamp}`);
+  await page.getByLabel('Name in Arabic').fill(`عباءة ${stamp}`);
   await page.getByRole('button', { name: 'Save type' }).click();
   await page.getByRole('dialog').waitFor({ state: 'detached', timeout: 15000 });
   await page.waitForFunction(
@@ -425,10 +436,19 @@ async function run() {
 
   await adminLink(page, 'Site content').click();
   await page.waitForURL('**/admin/content');
-  await page.getByLabel('Hero title').fill(`QA hero ${stamp}`);
+  // Each field is a fieldset with one input per language.
+  const heroField = page.locator('.contentField').filter({ hasText: 'Hero title' });
+  await heroField.getByLabel('In English').waitFor({ timeout: 20000 });
+  const arabicHeroBefore = await heroField.getByLabel('In Arabic').inputValue();
+  await heroField.getByLabel('In English').fill(`QA hero ${stamp}`);
   await page.getByRole('button', { name: 'Save content' }).click();
   await page.getByText('Site content saved.').waitFor({ timeout: 15000 });
   check('site content saves from the CMS', true);
+  check(
+    'editing the English copy leaves the Arabic copy untouched',
+    (await heroField.getByLabel('In Arabic').inputValue()) === arabicHeroBefore,
+    arabicHeroBefore,
+  );
 
   const visitor = await context.newPage();
   await visitor.goto(BASE);
@@ -508,6 +528,74 @@ async function run() {
     await mobilePage.screenshot({ path: join(SHOTS, '10-mobile.png'), fullPage: true });
   }
   await mobile.close();
+
+  section('Arabic is the default language');
+  // A context with nothing stored gets whatever the app defaults to.
+  const arabic = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const arabicPage = await arabic.newPage();
+  arabicPage.on('pageerror', (error) => consoleErrors.push(`ar :: ${error.message}`));
+  await arabicPage.goto(BASE);
+  await arabicPage.locator('.stepCard').first().waitFor({ timeout: 20000 });
+
+  const documentState = await arabicPage.evaluate(() => ({
+    lang: document.documentElement.lang,
+    dir: document.documentElement.dir,
+  }));
+  check('a first-time visitor gets Arabic', documentState.lang === 'ar', JSON.stringify(documentState));
+  check('the page is laid out right-to-left', documentState.dir === 'rtl', JSON.stringify(documentState));
+
+  const hasArabic = (value) => /[\u0600-\u06FF]/.test(value);
+  check('the hero headline is in Arabic', hasArabic(await arabicPage.locator('h1').first().innerText()));
+  check(
+    'the how-it-works steps are in Arabic',
+    (await arabicPage.locator('.stepCard h3').allInnerTexts()).every(hasArabic),
+  );
+  check('the navigation is in Arabic', (await arabicPage.locator('header nav a').allInnerTexts()).every(hasArabic));
+
+  // A key that was never translated renders as "group.key"; nothing should look like that.
+  const rawKeys = await arabicPage.evaluate(() => {
+    const groups =
+      'common|nav|home|login|register|closet|photos|studio|looks|imageDrop|states|guard|admin|errors';
+    const pattern = new RegExp(`\\b(${groups})\\.[a-zA-Z][a-zA-Z0-9]*\\b`);
+    return [...document.querySelectorAll('body *')]
+      .filter((element) => element.children.length === 0)
+      .map((element) => (element.textContent || '').trim())
+      .filter((value) => pattern.test(value));
+  });
+  check('no untranslated keys are rendered', rawKeys.length === 0, rawKeys.slice(0, 3).join(' | '));
+
+  const rtlOverflow = await arabicPage.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  check('the Arabic layout does not scroll sideways', rtlOverflow <= 1, `overflow ${rtlOverflow}px`);
+
+  if (SHOTS) {
+    mkdirSync(SHOTS, { recursive: true });
+    await arabicPage.screenshot({ path: join(SHOTS, '11-arabic-desktop.png'), fullPage: true });
+  }
+
+  // The switch must flip the document, and the choice must survive a reload.
+  await arabicPage.locator('.desktopLanguage .languageSwitch').click();
+  await arabicPage.waitForFunction(() => document.documentElement.dir === 'ltr', null, { timeout: 10000 });
+  check('switching to English flips the direction', true);
+  await arabicPage.reload();
+  await arabicPage.locator('.stepCard').first().waitFor({ timeout: 20000 });
+  const afterReload = await arabicPage.evaluate(() => document.documentElement.lang);
+  check('the language choice survives a reload', afterReload === 'en', afterReload);
+
+  const arabicMobile = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const arabicMobilePage = await arabicMobile.newPage();
+  await arabicMobilePage.goto(BASE);
+  await arabicMobilePage.locator('.stepCard').first().waitFor({ timeout: 20000 });
+  const mobileRtlOverflow = await arabicMobilePage.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  check('Arabic on a phone does not scroll sideways', mobileRtlOverflow <= 1, `overflow ${mobileRtlOverflow}px`);
+  if (SHOTS) {
+    await arabicMobilePage.screenshot({ path: join(SHOTS, '12-arabic-mobile.png'), fullPage: true });
+  }
+  await arabic.close();
+  await arabicMobile.close();
 
   section('Console health');
   const noisy = consoleErrors.filter((entry) => !/favicon|Download the React DevTools/i.test(entry));

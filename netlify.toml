@@ -1,0 +1,5 @@
+[[redirects]]
+  from = "/wear-it-api/*"
+  to = "http://34.45.85.65/wear-it-api/:splat"
+  status = 200
+  force = true

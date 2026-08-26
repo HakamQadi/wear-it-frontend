@@ -10,8 +10,11 @@ import { ImageDrop } from '@/components/ImageDrop';
 import { MemberGuard } from '@/components/MemberGuard';
 import { EmptyState, ErrorNote, LoadingState } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
-import { ApiError, api, mediaUrl } from '@/lib/api';
+import { useI18n } from '@/context/I18nContext';
+import { api, mediaUrl } from '@/lib/api';
+import { typeName } from '@/lib/localise';
 import type { ClothingType, WardrobeItem } from '@/lib/types';
+import { useErrorMessage } from '@/lib/useErrorMessage';
 
 type ItemForm = { name: string; typeId: string; imageUrl: string; color: string; brand: string; notes: string };
 
@@ -19,6 +22,9 @@ const EMPTY_FORM: ItemForm = { name: '', typeId: '', imageUrl: '', color: '', br
 
 function ClosetContent() {
   const { token } = useAuth();
+  const { t, locale, tag } = useI18n();
+  const describeError = useErrorMessage();
+
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [types, setTypes] = useState<ClothingType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,12 +49,12 @@ function ClosetContent() {
         setItems(await api<WardrobeItem[]>(`/wardrobe?${params}`, {}, token));
       } catch (caught: unknown) {
         setItems([]);
-        setListError(caught instanceof ApiError ? caught.message : 'Could not load your closet.');
+        setListError(describeError(caught, 'closet.loadFailed'));
       } finally {
         setLoading(false);
       }
     },
-    [token],
+    [token, describeError],
   );
 
   useEffect(() => {
@@ -62,14 +68,11 @@ function ClosetContent() {
     return () => clearTimeout(timer);
   }, [search, typeFilter, load]);
 
-  const counts = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const item of items) {
-      const key = item.typeId?.name ?? 'Uncategorised';
-      map.set(key, (map.get(key) ?? 0) + 1);
-    }
-    return map;
-  }, [items]);
+  const typeCount = useMemo(
+    () => new Set(items.map((item) => item.typeId?._id).filter(Boolean)).size,
+    [items],
+  );
+  const count = (value: number) => new Intl.NumberFormat(tag).format(value);
 
   function startCreate() {
     setEditing(null);
@@ -95,11 +98,11 @@ function ClosetContent() {
   async function save(event: FormEvent) {
     event.preventDefault();
     if (!form.imageUrl) {
-      setFormError('Add a photo of the item first.');
+      setFormError(t('closet.needPhoto'));
       return;
     }
     if (!form.typeId) {
-      setFormError('Pick a clothing type.');
+      setFormError(t('closet.needType'));
       return;
     }
     setSaving(true);
@@ -111,19 +114,19 @@ function ClosetContent() {
       setOpen(false);
       await load({ search, typeId: typeFilter });
     } catch (caught: unknown) {
-      setFormError(caught instanceof ApiError ? caught.message : 'Could not save the item.');
+      setFormError(describeError(caught, 'closet.saveFailed'));
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(item: WardrobeItem) {
-    if (!window.confirm(`Remove "${item.name}" from your closet? Looks you already generated are kept.`)) return;
+    if (!window.confirm(t('closet.confirmRemove', { name: item.name }))) return;
     try {
       await api(`/wardrobe/${item._id}`, { method: 'DELETE' }, token);
       await load({ search, typeId: typeFilter });
     } catch (caught: unknown) {
-      setListError(caught instanceof ApiError ? caught.message : 'Could not remove the item.');
+      setListError(describeError(caught, 'closet.removeFailed'));
     }
   }
 
@@ -136,28 +139,26 @@ function ClosetContent() {
         <div className="container">
           <section className="pageHead">
             <div>
-              <span className="eyebrow">My closet</span>
-              <h1>Your virtual wardrobe.</h1>
+              <span className="eyebrow">{t('closet.eyebrow')}</span>
+              <h1>{t('closet.title')}</h1>
               <p className="muted">
-                {items.length} item{items.length === 1 ? '' : 's'}
-                {counts.size > 0 && ` across ${counts.size} clothing type${counts.size === 1 ? '' : 's'}`}.
+                {t('closet.countItems', { count: count(items.length) })}
+                {typeCount > 0 && t('closet.countAcross', { count: count(typeCount) })}
               </p>
             </div>
             <div className="pageHeadActions">
               <Link href="/studio" className="button secondary">
                 <Sparkles size={17} />
-                Create a look
+                {t('closet.createLook')}
               </Link>
               <button className="button" onClick={startCreate} disabled={types.length === 0}>
                 <Plus size={17} />
-                Add item
+                {t('closet.addItem')}
               </button>
             </div>
           </section>
 
-          {types.length === 0 && (
-            <ErrorNote message="No clothing types are available yet. An administrator needs to add them in the CMS." />
-          )}
+          {types.length === 0 && <ErrorNote message={t('closet.noTypesWarning')} />}
           <ErrorNote message={listError} />
 
           <div className="filters">
@@ -166,39 +167,39 @@ function ClosetContent() {
               <input
                 className="input"
                 value={search}
-                placeholder="Search by name, brand or colour…"
+                placeholder={t('closet.searchPlaceholder')}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
             <select className="select filterSelect" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-              <option value="">All clothing types</option>
+              <option value="">{t('closet.allTypes')}</option>
               {types.map((type) => (
                 <option key={type._id} value={type._id}>
-                  {type.name}
+                  {typeName(type, locale)}
                 </option>
               ))}
             </select>
           </div>
 
           {loading ? (
-            <LoadingState label="Loading your closet" />
+            <LoadingState label={t('closet.loading')} />
           ) : items.length ? (
             <div className="itemGrid">
               {items.map((item) => (
                 <article className="itemCard" key={item._id}>
                   <div className="itemImageWrap">
                     <Image src={mediaUrl(item.imageUrl)} alt={item.name} fill unoptimized sizes="(max-width:700px) 50vw, 25vw" />
-                    <span className="itemType">{item.typeId?.name ?? 'No type'}</span>
+                    <span className="itemType">{typeName(item.typeId, locale, t('closet.noType'))}</span>
                   </div>
                   <div className="itemBody">
                     <strong>{item.name}</strong>
-                    <small>{[item.brand, item.color].filter(Boolean).join(' · ') || 'No brand or colour set'}</small>
+                    <small>{[item.brand, item.color].filter(Boolean).join(' · ') || t('closet.noBrandOrColour')}</small>
                   </div>
                   <div className="itemActions">
-                    <button aria-label={`Edit ${item.name}`} onClick={() => startEdit(item)}>
+                    <button aria-label={t('closet.editAria', { name: item.name })} onClick={() => startEdit(item)}>
                       <Pencil size={14} />
                     </button>
-                    <button aria-label={`Delete ${item.name}`} onClick={() => remove(item)}>
+                    <button aria-label={t('closet.deleteAria', { name: item.name })} onClick={() => remove(item)}>
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -206,15 +207,15 @@ function ClosetContent() {
               ))}
             </div>
           ) : filtering ? (
-            <EmptyState title="Nothing matches" text="Try another search term or clothing type." />
+            <EmptyState title={t('closet.noMatchTitle')} text={t('closet.noMatchText')} />
           ) : (
             <EmptyState
-              title="Your closet is empty"
-              text="Photograph a piece you own, give it a clothing type, and it becomes part of your virtual wardrobe."
+              title={t('closet.emptyTitle')}
+              text={t('closet.emptyText')}
               action={
                 <button className="button" onClick={startCreate} disabled={types.length === 0}>
                   <Plus size={17} />
-                  Add your first item
+                  {t('closet.addFirstItem')}
                 </button>
               }
             />
@@ -223,20 +224,20 @@ function ClosetContent() {
       </main>
 
       {open && (
-        <div className="modalBackdrop" role="dialog" aria-modal="true" aria-label={editing ? 'Edit item' : 'Add item'}>
+        <div className="modalBackdrop" role="dialog" aria-modal="true" aria-label={t(editing ? 'closet.dialogEdit' : 'closet.dialogAdd')}>
           <div className="modal">
             <div className="modalHeader">
               <h3>
-                <Shirt size={18} /> {editing ? 'Edit item' : 'Add a closet item'}
+                <Shirt size={18} /> {t(editing ? 'closet.dialogEdit' : 'closet.dialogAdd')}
               </h3>
-              <button aria-label="Close" onClick={() => setOpen(false)}>
+              <button aria-label={t('common.close')} onClick={() => setOpen(false)}>
                 <X />
               </button>
             </div>
             <form className="modalForm" onSubmit={save}>
               <ImageDrop
-                label="Item photo"
-                hint="Take a flat, well-lit photo, or paste the address of one from a shop."
+                label={t('closet.itemPhoto')}
+                hint={t('closet.itemPhotoHint')}
                 value={form.imageUrl}
                 token={token}
                 allowUrl
@@ -244,59 +245,59 @@ function ClosetContent() {
               />
               <div className="modalFields">
                 <label className="formField">
-                  <span>Name</span>
+                  <span>{t('closet.fieldName')}</span>
                   <input
                     className="input"
                     required
                     maxLength={80}
                     value={form.name}
-                    placeholder="Sand oversized tee"
+                    placeholder={t('closet.fieldNamePlaceholder')}
                     onChange={(event) => setForm({ ...form, name: event.target.value })}
                   />
                 </label>
                 <label className="formField">
-                  <span>Clothing type</span>
+                  <span>{t('closet.fieldType')}</span>
                   <select
                     className="select"
                     required
                     value={form.typeId}
                     onChange={(event) => setForm({ ...form, typeId: event.target.value })}
                   >
-                    <option value="">Choose a type</option>
+                    <option value="">{t('closet.chooseType')}</option>
                     {types.map((type) => (
                       <option key={type._id} value={type._id}>
-                        {type.name}
+                        {typeName(type, locale)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="formField">
-                  <span>Colour</span>
+                  <span>{t('closet.fieldColour')}</span>
                   <input
                     className="input"
                     maxLength={40}
                     value={form.color}
-                    placeholder="Sand"
+                    placeholder={t('closet.fieldColourPlaceholder')}
                     onChange={(event) => setForm({ ...form, color: event.target.value })}
                   />
                 </label>
                 <label className="formField">
-                  <span>Brand</span>
+                  <span>{t('closet.fieldBrand')}</span>
                   <input
                     className="input"
                     maxLength={60}
                     value={form.brand}
-                    placeholder="Optional"
+                    placeholder={t('closet.fieldBrandPlaceholder')}
                     onChange={(event) => setForm({ ...form, brand: event.target.value })}
                   />
                 </label>
                 <label className="formField full">
-                  <span>Notes</span>
+                  <span>{t('closet.fieldNotes')}</span>
                   <textarea
                     className="textarea"
                     maxLength={400}
                     value={form.notes}
-                    placeholder="Fits loose, best with dark denim…"
+                    placeholder={t('closet.fieldNotesPlaceholder')}
                     onChange={(event) => setForm({ ...form, notes: event.target.value })}
                   />
                 </label>
@@ -304,10 +305,10 @@ function ClosetContent() {
               <ErrorNote message={formError} />
               <div className="formActions">
                 <button type="button" className="button secondary sm" onClick={() => setOpen(false)}>
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button className="button sm" disabled={saving}>
-                  {saving ? 'Saving…' : editing ? 'Save changes' : 'Add to closet'}
+                  {saving ? t('closet.saving') : t(editing ? 'closet.saveEdit' : 'closet.saveNew')}
                 </button>
               </div>
             </form>
