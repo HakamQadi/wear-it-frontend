@@ -273,6 +273,7 @@ export const ar = {
     editType: 'تعديل نوع الملابس',
     typeNameEn: 'الاسم بالإنجليزية',
     typeNameAr: 'الاسم بالعربية',
+    typeNameArHint: 'يظهر للأعضاء عند استخدام الواجهة بالعربية.',
     typeSlug: 'المعرّف',
     typeOrder: 'ترتيب الطبقات',
     typeOrderHint: 'الأرقام الأصغر تُرتدى أقرب إلى الجسم.',

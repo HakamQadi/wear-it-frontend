@@ -219,10 +219,13 @@ export default function ClothingTypesAdmin() {
                 <input
                   className="input"
                   dir="rtl"
+                  required
+                  minLength={1}
                   maxLength={60}
                   value={form.nameAr}
                   onChange={(event) => setForm({ ...form, nameAr: event.target.value })}
                 />
+                <small className="fieldHint">{t('admin.typeNameArHint')}</small>
               </label>
               <label className="formField">
                 <span>{t('admin.typeSlug')}</span>

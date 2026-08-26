@@ -530,8 +530,13 @@ async function run() {
   await mobile.close();
 
   section('Arabic is the default language');
-  // A context with nothing stored gets whatever the app defaults to.
-  const arabic = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  // Keep the signed-in session but drop the pinned locale, so this context falls back to
+  // whatever the app defaults to while still being able to open the closet.
+  const signedInState = await context.storageState();
+  for (const origin of signedInState.origins ?? []) {
+    origin.localStorage = (origin.localStorage ?? []).filter((entry) => entry.name !== 'wear_it_locale');
+  }
+  const arabic = await browser.newContext({ viewport: { width: 1280, height: 900 }, storageState: signedInState });
   const arabicPage = await arabic.newPage();
   arabicPage.on('pageerror', (error) => consoleErrors.push(`ar :: ${error.message}`));
   await arabicPage.goto(BASE);
@@ -573,6 +578,26 @@ async function run() {
     mkdirSync(SHOTS, { recursive: true });
     await arabicPage.screenshot({ path: join(SHOTS, '11-arabic-desktop.png'), fullPage: true });
   }
+
+  // Clothing type names are admin-managed content, not UI strings, so they need their own
+  // Arabic label to avoid English leaking into an otherwise Arabic screen.
+  await arabicPage.goto(`${BASE}/closet`);
+  await arabicPage.locator('.itemCard').first().waitFor({ timeout: 20000 });
+  const chips = await arabicPage.locator('.itemType').allInnerTexts();
+  check('clothing type chips are in Arabic', chips.length > 0 && chips.every(hasArabic), chips.join(', '));
+
+  const options = await arabicPage.locator('.filterSelect option').allInnerTexts();
+  check('the clothing type filter lists Arabic names', options.slice(1).every(hasArabic), options.slice(1, 4).join(', '));
+
+  await arabicPage.goto(`${BASE}/looks`);
+  await arabicPage.locator('.lookCard').first().waitFor({ timeout: 20000 });
+  check(
+    'a saved look shows its garment types in Arabic',
+    hasArabic(await arabicPage.locator('.lookBody strong').first().innerText()),
+    await arabicPage.locator('.lookBody strong').first().innerText(),
+  );
+  await arabicPage.goto(BASE);
+  await arabicPage.locator('.stepCard').first().waitFor({ timeout: 20000 });
 
   // The switch must flip the document, and the choice must survive a reload.
   await arabicPage.locator('.desktopLanguage .languageSwitch').click();

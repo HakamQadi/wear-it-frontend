@@ -278,6 +278,7 @@ export const en: { [K in keyof typeof ar]: { [P in keyof (typeof ar)[K]]: string
     editType: 'Edit clothing type',
     typeNameEn: 'Name in English',
     typeNameAr: 'Name in Arabic',
+    typeNameArHint: 'Shown to members using the Arabic interface.',
     typeSlug: 'Slug',
     typeOrder: 'Layer order',
     typeOrderHint: 'Lower numbers are worn closer to the body.',
