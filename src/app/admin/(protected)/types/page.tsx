@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pagination, usePagedRows } from '@/components/Pagination';
 import { ErrorNote, LoadingState } from '@/components/StateViews';
 import { useI18n } from '@/context/I18nContext';
 import { api } from '@/lib/api';
@@ -36,14 +37,19 @@ export default function ClothingTypesAdmin() {
   const [form, setForm] = useState<TypeForm>(EMPTY);
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
+  const paged = usePagedRows(rows);
 
+  /** Returns the reloaded rows so a caller can find where a saved type landed. */
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setRows(await api<TypeUsage[]>('/admin/type-usage', {}, adminSession.get()));
+      const loaded = await api<TypeUsage[]>('/admin/type-usage', {}, adminSession.get());
+      setRows(loaded);
       setError('');
+      return loaded;
     } catch (caught: unknown) {
       setError(describeError(caught, 'admin.typesLoadFailed'));
+      return [];
     } finally {
       setLoading(false);
     }
@@ -88,10 +94,15 @@ export default function ClothingTypesAdmin() {
     setFormError('');
     try {
       const body = JSON.stringify({ ...form, sortOrder: Number(form.sortOrder) });
-      if (editing) await api(`/clothing-types/${editing._id}`, { method: 'PATCH', body }, adminSession.get());
-      else await api('/clothing-types', { method: 'POST', body }, adminSession.get());
+      const saved = editing
+        ? await api<ClothingType>(`/clothing-types/${editing._id}`, { method: 'PATCH', body }, adminSession.get())
+        : await api<ClothingType>('/clothing-types', { method: 'POST', body }, adminSession.get());
       setOpen(false);
-      await load();
+      // A saved type keeps its place in the sort order, which is rarely the page the
+      // admin was looking at, so follow it rather than leaving them on a stale page.
+      const reloaded = await load();
+      const index = reloaded.findIndex((row) => row._id === saved?._id);
+      if (index >= 0) paged.setPage(paged.pageOf(index));
     } catch (caught: unknown) {
       setFormError(describeError(caught, 'admin.typeSaveFailed'));
     } finally {
@@ -128,61 +139,64 @@ export default function ClothingTypesAdmin() {
         {loading ? (
           <LoadingState />
         ) : (
-          <div className="adminTableWrap">
-            <table className="adminTable">
-              <thead>
-                <tr>
-                  <th>{t('admin.colName')}</th>
-                  <th>{t('admin.colSlug')}</th>
-                  <th>{t('admin.colOrder')}</th>
-                  <th>{t('admin.colItemsInUse')}</th>
-                  <th>{t('admin.colStatus')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row._id}>
-                    <td>
-                      <strong>{typeName(row, locale)}</strong>
-                    </td>
-                    <td className="muted" dir="ltr">
-                      /{row.slug}
-                    </td>
-                    <td>{number(row.sortOrder)}</td>
-                    <td>{number(row.itemCount)}</td>
-                    <td>
-                      <span className={`status ${row.isActive ? 'active' : ''}`}>
-                        {t(row.isActive ? 'admin.statusVisible' : 'admin.statusHidden')}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="rowActions">
-                        <button aria-label={t('closet.editAria', { name: typeName(row, locale) })} onClick={() => startEdit(row)}>
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          aria-label={t('closet.deleteAria', { name: typeName(row, locale) })}
-                          onClick={() => remove(row)}
-                          disabled={row.itemCount > 0}
-                          title={row.itemCount > 0 ? t('admin.deleteBlocked') : t('common.delete')}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
+          <>
+            <div className="adminTableWrap">
+              <table className="adminTable">
+                <thead>
                   <tr>
-                    <td colSpan={6} className="muted">
-                      {t('admin.noTypesAddFirst')}
-                    </td>
+                    <th>{t('admin.colName')}</th>
+                    <th>{t('admin.colSlug')}</th>
+                    <th>{t('admin.colOrder')}</th>
+                    <th>{t('admin.colItemsInUse')}</th>
+                    <th>{t('admin.colStatus')}</th>
+                    <th />
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paged.visible.map((row) => (
+                    <tr key={row._id}>
+                      <td>
+                        <strong>{typeName(row, locale)}</strong>
+                      </td>
+                      <td className="muted" dir="ltr">
+                        /{row.slug}
+                      </td>
+                      <td>{number(row.sortOrder)}</td>
+                      <td>{number(row.itemCount)}</td>
+                      <td>
+                        <span className={`status ${row.isActive ? 'active' : ''}`}>
+                          {t(row.isActive ? 'admin.statusVisible' : 'admin.statusHidden')}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="rowActions">
+                          <button aria-label={t('closet.editAria', { name: typeName(row, locale) })} onClick={() => startEdit(row)}>
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            aria-label={t('closet.deleteAria', { name: typeName(row, locale) })}
+                            onClick={() => remove(row)}
+                            disabled={row.itemCount > 0}
+                            title={row.itemCount > 0 ? t('admin.deleteBlocked') : t('common.delete')}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="muted">
+                        {t('admin.noTypesAddFirst')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <Pagination total={paged.total} page={paged.page} onPage={paged.setPage} />
+          </>
         )}
       </section>
 

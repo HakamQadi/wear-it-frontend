@@ -331,6 +331,19 @@ h3 { font-size: 19px; }
   font-weight: 400;
 }
 .textarea { padding: 12px 14px; min-height: 100px; resize: vertical; }
+/* Native select paints its own arrow over the text box, so draw our own chevron at the
+   inline end and reserve room for it. */
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-inline-end: 38px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23767268' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+[dir='rtl'] .select { background-position: left 14px center; }
 .input:focus, .select:focus, .textarea:focus { border-color: #9ba99f; box-shadow: 0 0 0 3px rgba(220, 231, 220, 0.6); }
 
 .formField { display: flex; flex-direction: column; gap: 7px; font-size: 12px; font-weight: 700; }
@@ -388,25 +401,30 @@ h3 { font-size: 19px; }
 }
 .imageDropZone.static { cursor: default; }
 .sourceTabs {
-  display: inline-flex;
-  gap: 2px;
+  display: flex;
+  gap: 0;
   padding: 3px;
   border-radius: 999px;
   background: var(--soft);
   border: 1px solid var(--line);
 }
 .sourceTabs button {
+  flex: 1;
   border: 0;
   background: transparent;
   border-radius: 999px;
-  padding: 6px 11px;
+  padding: 8px 11px;
   font-size: 11px;
   font-weight: 700;
   color: var(--muted);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
+.sourceTabs button:hover:not(.active) { color: var(--ink); }
 .sourceTabs button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(20, 22, 20, 0.12); }
 .linkRow { display: flex; flex-direction: column; gap: 7px; }
 .linkRow .input { min-height: 44px; min-width: 0; }
@@ -785,7 +803,7 @@ h3 { font-size: 19px; }
 
 /* ----------------------------------------------------------------- admin */
 .adminBody { background: #f5f5f2; min-height: 100vh; }
-.adminLayout { min-height: 100vh; display: grid; grid-template-columns: 250px 1fr; }
+.adminLayout { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); }
 .adminSidebar {
   background: #171817;
   color: #fff;
@@ -833,7 +851,7 @@ h3 { font-size: 19px; }
   color: #fff;
 }
 .adminSideFooter { margin-top: auto; display: flex; flex-direction: column; gap: 3px; border-top: 1px solid #303130; padding-top: 12px; }
-.adminMain { padding: 34px clamp(20px, 4vw, 52px); }
+.adminMain { min-width: 0; padding: 34px clamp(20px, 4vw, 52px); }
 .adminTop { display: flex; justify-content: space-between; gap: 20px; align-items: center; margin-bottom: 26px; flex-wrap: wrap; }
 .adminTop h1 { font-size: 32px; }
 .adminTop p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
@@ -847,7 +865,7 @@ h3 { font-size: 19px; }
 .adminPanel { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 22px; margin-top: 18px; }
 .adminPanelHeader { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
 .adminPanelHeader p { margin: 4px 0 0; font-size: 12px; }
-.adminTableWrap { overflow-x: auto; }
+.adminTableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .adminTable { width: 100%; border-collapse: collapse; min-width: 640px; }
 .adminTable th {
   text-align: start;
@@ -859,6 +877,30 @@ h3 { font-size: 19px; }
   border-bottom: 1px solid var(--line);
 }
 .adminTable td { padding: 13px 10px; border-bottom: 1px solid #f0efeb; font-size: 12px; vertical-align: middle; }
+/* Sits outside .adminTableWrap so it stays put while the table scrolls sideways. */
+.tablePagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+}
+.pageButtons { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.pageButtons button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+}
+.pageButtons button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pageButtons button:disabled { opacity: 0.35; }
 .status { display: inline-flex; padding: 6px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; background: #eee; color: #555; }
 .status.active { background: #e1eee3; color: #355d3e; }
 .rowActions { display: flex; gap: 5px; }
@@ -938,11 +980,47 @@ h3 { font-size: 19px; }
   .resultPanel { grid-template-columns: 1fr; }
   .uploadPanel { grid-template-columns: 1fr; }
   .modalForm { grid-template-columns: 1fr; }
-  .adminLayout { grid-template-columns: 1fr; }
-  .adminSidebar { height: auto; position: relative; display: block; }
-  .adminSidebar nav { flex-direction: row; overflow-x: auto; padding-bottom: 6px; }
+  .adminLayout { grid-template-columns: minmax(0, 1fr); }
+  /* The sidebar folds into a top bar: brand and session actions share the first row,
+     the section links wrap beneath. The footer stays visible because logging out and
+     switching language are the only way off this screen. The bar scrolls away with the
+     page — sticking two or three rows to the top costs too much of a phone screen. */
+  .adminSidebar {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+  }
+  .adminBrand { order: 0; flex: 1; min-width: 0; padding: 0; }
+  .adminSideFooter {
+    order: 1;
+    flex-direction: row;
+    align-items: center;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    gap: 2px;
+  }
+  .adminSideFooter a, .adminSideFooter button, .adminSideFooter .languageSwitch {
+    width: auto;
+    min-width: 40px;
+    min-height: 40px;
+    justify-content: center;
+    padding: 10px;
+  }
+  /* Wrapping rather than scrolling: a hidden horizontal rail leaves the current section
+     off-screen, and a resized desktop window has no touch gesture to reach it. */
+  .adminSidebar nav {
+    order: 2;
+    flex: 1 0 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
   .adminSidebar nav a { white-space: nowrap; }
-  .adminSideFooter { display: none; }
   .authPage { grid-template-columns: 1fr; }
   .authVisual { display: none; }
   .footer { grid-template-columns: 1fr; }
@@ -961,6 +1039,24 @@ h3 { font-size: 19px; }
   .statGrid { grid-template-columns: 1fr; }
   .modalFields { grid-template-columns: 1fr; }
   .adminForm { grid-template-columns: 1fr; }
+  /* Icons alone on a phone; the labels would push the brand off the row. */
+  .adminSideFooter span { display: none; }
+  .adminMain { padding: 20px 16px 42px; }
+  .adminTop { gap: 12px; margin-bottom: 18px; }
+  .adminTop h1 { font-size: 26px; }
+  .adminTop > div { min-width: 0; }
+  .adminPanel { padding: 15px; border-radius: 14px; margin-top: 14px; }
+  .adminPanelHeader { flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .statCard { padding: 16px; }
+  .statValue { font-size: 26px; }
+  .rowActions button { width: 40px; height: 40px; }
+  .pageButtons button { width: 40px; height: 40px; }
+  .tablePagination { justify-content: center; gap: 10px; }
+  /* Touch targets: the compact desktop sizes are below the 40px comfortable minimum. */
+  .adminMain .button.sm { min-height: 42px; }
+  .adminSidebar nav a { min-height: 40px; padding: 0 11px; font-size: 12px; }
+  .adminPanelHeader .textButton { padding: 10px 4px; }
+  .contentField { padding: 12px 13px 14px; }
   .filters { display: grid; grid-template-columns: 1fr; }
   .filterSelect { width: 100%; }
   .closingBand { padding: 26px; }

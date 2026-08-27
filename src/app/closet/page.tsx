@@ -26,11 +26,13 @@ function ClosetContent() {
   const describeError = useErrorMessage();
 
   const [items, setItems] = useState<WardrobeItem[]>([]);
-  const [types, setTypes] = useState<ClothingType[]>([]);
+  // Null until the list arrives, so the "no types yet" warning waits for an answer.
+  const [types, setTypes] = useState<ClothingType[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [listError, setListError] = useState('');
+  const [typesError, setTypesError] = useState('');
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<WardrobeItem | null>(null);
@@ -60,8 +62,10 @@ function ClosetContent() {
   useEffect(() => {
     api<ClothingType[]>('/clothing-types')
       .then(setTypes)
-      .catch(() => setTypes([]));
-  }, []);
+      // A failed request is not an empty list: leave the types unknown so the page
+      // reports the failure instead of blaming the administrator for adding none.
+      .catch((caught: unknown) => setTypesError(describeError(caught, 'closet.typesLoadFailed')));
+  }, [describeError]);
 
   useEffect(() => {
     const timer = setTimeout(() => load({ search, typeId: typeFilter }), 250);
@@ -73,10 +77,11 @@ function ClosetContent() {
     [items],
   );
   const count = (value: number) => new Intl.NumberFormat(tag).format(value);
+  const typeOptions = types ?? [];
 
   function startCreate() {
     setEditing(null);
-    setForm({ ...EMPTY_FORM, typeId: types[0]?._id ?? '' });
+    setForm({ ...EMPTY_FORM, typeId: typeOptions[0]?._id ?? '' });
     setFormError('');
     setOpen(true);
   }
@@ -151,14 +156,15 @@ function ClosetContent() {
                 <Sparkles size={17} />
                 {t('closet.createLook')}
               </Link>
-              <button className="button" onClick={startCreate} disabled={types.length === 0}>
+              <button className="button" onClick={startCreate} disabled={typeOptions.length === 0}>
                 <Plus size={17} />
                 {t('closet.addItem')}
               </button>
             </div>
           </section>
 
-          {types.length === 0 && <ErrorNote message={t('closet.noTypesWarning')} />}
+          {types?.length === 0 && <ErrorNote message={t('closet.noTypesWarning')} />}
+          <ErrorNote message={typesError} />
           <ErrorNote message={listError} />
 
           <div className="filters">
@@ -173,7 +179,7 @@ function ClosetContent() {
             </div>
             <select className="select filterSelect" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
               <option value="">{t('closet.allTypes')}</option>
-              {types.map((type) => (
+              {typeOptions.map((type) => (
                 <option key={type._id} value={type._id}>
                   {typeName(type, locale)}
                 </option>
@@ -213,7 +219,7 @@ function ClosetContent() {
               title={t('closet.emptyTitle')}
               text={t('closet.emptyText')}
               action={
-                <button className="button" onClick={startCreate} disabled={types.length === 0}>
+                <button className="button" onClick={startCreate} disabled={typeOptions.length === 0}>
                   <Plus size={17} />
                   {t('closet.addFirstItem')}
                 </button>
@@ -264,7 +270,7 @@ function ClosetContent() {
                     onChange={(event) => setForm({ ...form, typeId: event.target.value })}
                   >
                     <option value="">{t('closet.chooseType')}</option>
-                    {types.map((type) => (
+                    {typeOptions.map((type) => (
                       <option key={type._id} value={type._id}>
                         {typeName(type, locale)}
                       </option>

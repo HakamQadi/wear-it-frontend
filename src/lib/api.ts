@@ -2,11 +2,21 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export const API_ORIGIN = API_URL.replace(/\/api\/?$/, '');
 
+/**
+ * Optional fast path for ImageKit-hosted media: with the endpoint set, images are requested
+ * straight from the CDN instead of following the backend's redirect. Leave it unset and the
+ * backend answers /uploads/... itself — serving the file or redirecting — so this only ever
+ * saves a round trip. The folder must match IMAGEKIT_FOLDER on the backend.
+ */
+const MEDIA_CDN = process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT?.replace(/\/+$/, '');
+const MEDIA_CDN_FOLDER = (process.env.NEXT_PUBLIC_IMAGEKIT_FOLDER || 'wear-it').replace(/^\/+|\/+$/g, '');
+
 /** Turns a stored /uploads/... path into a URL the browser can load. */
 export function mediaUrl(value?: string) {
   if (!value) return '';
-  if (value.startsWith('/uploads/')) return `${API_ORIGIN}${value}`;
-  return value;
+  if (!value.startsWith('/uploads/')) return value;
+  if (MEDIA_CDN) return `${MEDIA_CDN}/${MEDIA_CDN_FOLDER}/${value.slice('/uploads/'.length)}`;
+  return `${API_ORIGIN}${value}`;
 }
 
 export class ApiError extends Error {

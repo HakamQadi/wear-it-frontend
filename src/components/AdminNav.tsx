@@ -40,18 +40,20 @@ export function AdminNav() {
       </nav>
       <div className="adminSideFooter">
         <LanguageSwitch />
-        <Link href="/" target="_blank">
+        <Link href="/" target="_blank" aria-label={t('admin.viewSite')} title={t('admin.viewSite')}>
           <Store size={17} />
-          {t('admin.viewSite')}
+          <span>{t('admin.viewSite')}</span>
         </Link>
         <button
+          aria-label={t('admin.logOut')}
+          title={t('admin.logOut')}
           onClick={() => {
             adminSession.clear();
             router.push('/admin/login');
           }}
         >
           <LogOut size={17} />
-          {t('admin.logOut')}
+          <span>{t('admin.logOut')}</span>
         </button>
       </div>
     </aside>

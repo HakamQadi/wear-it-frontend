@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Images, Shirt, Sparkles, Users } from 'lucide-react';
+import { Pagination, usePagedRows } from '@/components/Pagination';
 import { ErrorNote, LoadingState } from '@/components/StateViews';
 import { useI18n } from '@/context/I18nContext';
 import { api } from '@/lib/api';
@@ -17,6 +18,7 @@ export default function AdminOverview() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [usage, setUsage] = useState<TypeUsage[]>([]);
   const [error, setError] = useState('');
+  const paged = usePagedRows(usage);
 
   useEffect(() => {
     const token = adminSession.get();
@@ -105,7 +107,7 @@ export default function AdminOverview() {
                   </tr>
                 </thead>
                 <tbody>
-                  {usage.map((row) => (
+                  {paged.visible.map((row) => (
                     <tr key={row._id}>
                       <td>
                         <strong>{typeName(row, locale)}</strong>
@@ -132,6 +134,7 @@ export default function AdminOverview() {
                 </tbody>
               </table>
             </div>
+            <Pagination total={paged.total} page={paged.page} onPage={paged.setPage} />
           </section>
         </>
       )}

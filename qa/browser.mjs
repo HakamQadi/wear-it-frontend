@@ -407,8 +407,16 @@ async function run() {
   await adminLink(page, 'Clothing types').click();
   await page.waitForURL('**/admin/types');
   await page.locator('.adminTable tbody tr').first().waitFor();
+  // The table pages at ten rows, so the count of every type comes from the pager.
+  const totalTypes = () =>
+    page.evaluate(() => {
+      const pager = document.querySelector('.tablePagination');
+      return pager ? Number(pager.dataset.total) : document.querySelectorAll('.adminTable tbody tr').length;
+    });
   const typeRows = await page.locator('.adminTable tbody tr').count();
-  check('every clothing type is listed', typeRows >= 14, `rows ${typeRows}`);
+  const typeTotal = await totalTypes();
+  check('a page of clothing types is listed', typeRows === Math.min(typeTotal, 10), `rows ${typeRows} of ${typeTotal}`);
+  check('every clothing type is counted', typeTotal >= 14, `total ${typeTotal}`);
   check(
     'a type still in use cannot be deleted',
     await page.getByRole('button', { name: 'Delete T-shirt' }).isDisabled(),
@@ -421,12 +429,9 @@ async function run() {
   await page.getByLabel('Name in Arabic').fill(`عباءة ${stamp}`);
   await page.getByRole('button', { name: 'Save type' }).click();
   await page.getByRole('dialog').waitFor({ state: 'detached', timeout: 15000 });
-  await page.waitForFunction(
-    (expected) => document.querySelectorAll('.adminTable tbody tr').length === expected,
-    typeRows + 1,
-    { timeout: 15000 },
-  );
-  check('the new clothing type is saved', (await page.locator('.adminTable tbody tr').count()) === typeRows + 1);
+  // Saving jumps to whichever page the new type sorted onto, so look for the row itself.
+  await page.getByRole('cell', { name: `QA Cape ${stamp}`, exact: true }).first().waitFor({ timeout: 15000 });
+  check('the new clothing type is saved', (await totalTypes()) === typeTotal + 1, `total ${await totalTypes()}`);
   await shot(page, '09-admin-types');
 
   await adminLink(page, 'Members').click();
