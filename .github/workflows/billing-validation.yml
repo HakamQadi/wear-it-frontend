@@ -1,0 +1,42 @@
+name: Billing frontend validation
+on:
+  push:
+    branches: [qa/billing-validation-20260827]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports: ["27017:27017"]
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm install
+      - run: npm run lint
+      - run: NEXT_PUBLIC_API_URL=http://127.0.0.1:4100/api npm run build
+      - name: Prepare backend QA tree
+        run: |
+          git clone --depth 1 --branch qa/billing-validation-20260827 https://github.com/HakamQadi/wear-it-backend.git /tmp/wear-it-backend
+          cd /tmp/wear-it-backend
+          npm install
+          npm run build
+      - name: Start full stack
+        run: |
+          cd /tmp/wear-it-backend
+          node qa/openai-stub.mjs >/tmp/openai.log 2>&1 &
+          WEAR_IT_WEBHOOK_URL=http://127.0.0.1:4100/api/billing/webhook STRIPE_WEBHOOK_SECRET=whsec_stub node qa/stripe-stub.mjs >/tmp/stripe.log 2>&1 &
+          MONGODB_URI=mongodb://127.0.0.1:27017/wear_it_frontend_qa PORT=4100 FRONTEND_URL=http://127.0.0.1:3005 BILLING_FRONTEND_URL=http://127.0.0.1:3005 UPLOADS_DIR=/tmp/wear-it-frontend-uploads IMAGE_IMPORT_ALLOW_LOOPBACK=true OPENAI_API_KEY=stub OPENAI_BASE_URL=http://127.0.0.1:4999/v1 STRIPE_SECRET_KEY=sk_test_stub STRIPE_WEBHOOK_SECRET=whsec_stub STRIPE_API_BASE_URL=http://127.0.0.1:4998/v1 ADMIN_EMAIL=admin@wearit.local ADMIN_PASSWORD='WearIt123!' node dist/main.js >/tmp/api.log 2>&1 &
+          cd "$GITHUB_WORKSPACE"
+          NEXT_PUBLIC_API_URL=http://127.0.0.1:4100/api npm start -- -p 3005 >/tmp/frontend.log 2>&1 &
+          for i in {1..60}; do curl -fsS http://127.0.0.1:4100/api/health >/dev/null && curl -fsS http://127.0.0.1:3005 >/dev/null && exit 0; sleep 1; done
+          cat /tmp/api.log /tmp/frontend.log; exit 1
+      - run: npx playwright install --with-deps chromium
+      - run: BASE_URL=http://127.0.0.1:3005 API_URL=http://127.0.0.1:4100/api npm run qa:browser
+      - run: BASE_URL=http://127.0.0.1:3005 API_URL=http://127.0.0.1:4100/api npm run qa:billing-browser
+      - if: failure()
+        run: cat /tmp/api.log /tmp/frontend.log /tmp/openai.log /tmp/stripe.log || true
