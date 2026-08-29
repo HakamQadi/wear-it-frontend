@@ -877,6 +877,13 @@ h3 { font-size: 19px; }
   border-bottom: 1px solid var(--line);
 }
 .adminTable td { padding: 13px 10px; border-bottom: 1px solid #f0efeb; font-size: 12px; vertical-align: middle; }
+.memberAdminTable { min-width: 980px; }
+.memberPlanMeta { display: flex; flex-direction: column; gap: 3px; white-space: nowrap; }
+.memberPlanMeta small { color: var(--muted); font-size: 10px; font-weight: 600; }
+.memberPlanControl { display: flex; align-items: center; gap: 8px; min-width: 290px; }
+.memberPlanControl .select { min-width: 150px; min-height: 38px; }
+.memberPlanControl .button { flex: 0 0 auto; }
+.adminNotice { margin: 0 0 14px; color: #355d3e; font-size: 13px; font-weight: 700; }
 /* Sits outside .adminTableWrap so it stays put while the table scrolls sideways. */
 .tablePagination {
   display: flex;
@@ -1054,6 +1061,39 @@ h3 { font-size: 19px; }
   .tablePagination { justify-content: center; gap: 10px; }
   /* Touch targets: the compact desktop sizes are below the 40px comfortable minimum. */
   .adminMain .button.sm { min-height: 42px; }
+  .memberPlanControl .select { min-height: 42px; }
+  .memberAdminTable { min-width: 0; }
+  .memberAdminTable thead { display: none; }
+  .memberAdminTable,
+  .memberAdminTable tbody,
+  .memberAdminTable tr,
+  .memberAdminTable td { display: block; width: 100%; }
+  .memberAdminTable tr {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 5px 12px;
+    margin-bottom: 12px;
+  }
+  .memberAdminTable td {
+    display: grid;
+    grid-template-columns: minmax(92px, 0.45fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .memberAdminTable td::before {
+    content: attr(data-label);
+    color: #8b8d89;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .memberAdminTable .memberEmptyState { display: block; padding: 18px 0; }
+  .memberAdminTable .memberEmptyState::before { content: none; }
+  .memberPlanControl { min-width: 0; width: 100%; flex-direction: column; align-items: stretch; }
+  .memberPlanControl .select { width: 100%; min-width: 0; }
+  .memberPlanControl .button { width: 100%; }
   .adminSidebar nav a { min-height: 40px; padding: 0 11px; font-size: 12px; }
   .adminPanelHeader .textButton { padding: 10px 4px; }
   .contentField { padding: 12px 13px 14px; }

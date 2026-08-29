@@ -7,7 +7,7 @@ import { ErrorNote, LoadingState } from '@/components/StateViews';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/context/I18nContext';
 import { api } from '@/lib/api';
-import type { BillingStatus, Plan } from '@/lib/types';
+import { PlanTier, type BillingStatus, type Plan } from '@/lib/types';
 
 function money(plan: Plan, locale: string) {
   try {
@@ -47,7 +47,7 @@ export default function BillingPage() {
           for (let attempt = 0; attempt < 4 && !cancelled; attempt += 1) {
             const status = await api<BillingStatus>('/billing/me', {}, token);
             setBilling(status);
-            if (status.plan.tier === 'pro') {
+            if (status.plan.tier === PlanTier.PRO) {
               setNotice(ar ? 'تم تفعيل خطة برو.' : 'Your Pro plan is active.');
               break;
             }
@@ -135,12 +135,12 @@ export default function BillingPage() {
                     <ul style={{ listStyle: 'none', padding: 0, margin: '18px 0', display: 'grid', gap: 10 }}>
                       {features.map((feature) => <li key={feature} style={{ display: 'flex', gap: 8 }}><Check size={16} />{feature}</li>)}
                     </ul>
-                    {plan.tier === 'pro' && !current && (
+                    {plan.tier === PlanTier.PRO && !current && (
                       <button className="button" onClick={upgrade} disabled={Boolean(busy) || billing.subscription.status === 'past_due' || !billing.paymentsConfigured}>
                         {busy === 'checkout' ? (ar ? 'جارٍ التحويل…' : 'Opening checkout…') : (ar ? 'الترقية إلى برو' : 'Upgrade to Pro')}
                       </button>
                     )}
-                    {plan.tier === 'pro' && !current && !billing.paymentsConfigured && <p className="muted" style={{ marginTop: 10 }}>{ar ? 'الدفع غير مفعّل حالياً.' : 'Payments are not configured yet.'}</p>}
+                    {plan.tier === PlanTier.PRO && !current && !billing.paymentsConfigured && <p className="muted" style={{ marginTop: 10 }}>{ar ? 'الدفع غير مفعّل حالياً.' : 'Payments are not configured yet.'}</p>}
                   </section>
                 );
               })}

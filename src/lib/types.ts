@@ -57,9 +57,37 @@ export type AdminStats = {
   members: number; types: number; activeTypes: number; items: number; photos: number; looks: number; readyLooks: number; failedLooks: number;
 };
 export type TypeUsage = Pick<ClothingType, '_id' | 'name' | 'nameAr' | 'slug' | 'isActive' | 'sortOrder'> & { itemCount: number };
-export type MemberRow = { _id: string; name: string; email: string; createdAt: string; itemCount: number; lookCount: number };
+export enum PlanTier {
+  FREE = 'free',
+  PRO = 'pro',
+}
 
-export type PlanTier = 'free' | 'pro';
+export type MemberPlan = {
+  _id: string;
+  tier: PlanTier;
+  name: string;
+  nameAr: string;
+  generationLimit: number;
+  isActive: boolean;
+};
+
+export type MemberRow = {
+  _id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  itemCount: number;
+  lookCount: number;
+  generationCount: number;
+  plan: MemberPlan | null;
+};
+
+export type AssignMemberPlanResponse = {
+  userId: string;
+  generationCount: number;
+  plan: MemberPlan;
+};
+
 export type Plan = {
   _id: string;
   tier: PlanTier;

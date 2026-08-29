@@ -6,7 +6,7 @@ import { ErrorNote, LoadingState } from '@/components/StateViews';
 import { useI18n } from '@/context/I18nContext';
 import { api } from '@/lib/api';
 import { adminSession } from '@/lib/auth';
-import type { Plan, PlanTier } from '@/lib/types';
+import { PlanTier, type Plan } from '@/lib/types';
 
 export default function PlansAdminPage() {
   const { locale } = useI18n();
@@ -39,12 +39,12 @@ export default function PlansAdminPage() {
           nameAr: plan.nameAr,
           description: plan.description,
           descriptionAr: plan.descriptionAr,
-          priceCents: plan.tier === 'free' ? 0 : plan.priceCents,
+          priceCents: plan.tier === PlanTier.FREE ? 0 : plan.priceCents,
           currency: plan.currency,
           generationLimit: plan.generationLimit,
           features: plan.features,
           featuresAr: plan.featuresAr,
-          isActive: plan.tier === 'free' ? true : plan.isActive,
+          isActive: plan.tier === PlanTier.FREE ? true : plan.isActive,
         }),
       }, adminSession.get());
       edit(plan.tier, saved);
@@ -70,14 +70,14 @@ export default function PlansAdminPage() {
           {plans.map((plan) => (
             <form key={plan._id} className="adminPanel contentForm" onSubmit={(event) => save(event, plan)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                <div><h2 style={{ margin: 0 }}>{plan.tier === 'free' ? 'Free' : 'Pro'}</h2><small className="muted">{plan.tier === 'free' ? (ar ? 'خطة أساسية دائمة' : 'Permanent base tier') : (ar ? 'اشتراك شهري مدفوع' : 'Paid monthly subscription')}</small></div>
-                {plan.tier === 'pro' && <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={plan.isActive} onChange={(e) => edit(plan.tier, { isActive: e.target.checked })} />{ar ? 'متاحة للشراء' : 'Available for purchase'}</label>}
+                <div><h2 style={{ margin: 0 }}>{plan.tier === PlanTier.FREE ? 'Free' : 'Pro'}</h2><small className="muted">{plan.tier === PlanTier.FREE ? (ar ? 'خطة أساسية دائمة' : 'Permanent base tier') : (ar ? 'اشتراك شهري مدفوع' : 'Paid monthly subscription')}</small></div>
+                {plan.tier === PlanTier.PRO && <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={plan.isActive} onChange={(e) => edit(plan.tier, { isActive: e.target.checked })} />{ar ? 'متاحة للشراء' : 'Available for purchase'}</label>}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
                 <label className="formField"><span>{ar ? 'الاسم بالإنجليزية' : 'English name'}</span><input className="input" value={plan.name} onChange={(e) => edit(plan.tier, { name: e.target.value })} required /></label>
                 <label className="formField"><span>{ar ? 'الاسم بالعربية' : 'Arabic name'}</span><input className="input" dir="rtl" value={plan.nameAr} onChange={(e) => edit(plan.tier, { nameAr: e.target.value })} required /></label>
-                <label className="formField"><span>{ar ? 'السعر الشهري' : 'Monthly price'}</span><input className="input" type="number" min={0} step="0.01" disabled={plan.tier === 'free'} value={plan.priceCents / 100} onChange={(e) => edit(plan.tier, { priceCents: Math.max(0, Math.round(Number(e.target.value || 0) * 100)) })} /></label>
+                <label className="formField"><span>{ar ? 'السعر الشهري' : 'Monthly price'}</span><input className="input" type="number" min={0} step="0.01" disabled={plan.tier === PlanTier.FREE} value={plan.priceCents / 100} onChange={(e) => edit(plan.tier, { priceCents: Math.max(0, Math.round(Number(e.target.value || 0) * 100)) })} /></label>
                 <label className="formField"><span>{ar ? 'العملة' : 'Currency'}</span><input className="input" maxLength={3} minLength={3} value={plan.currency} onChange={(e) => edit(plan.tier, { currency: e.target.value.toUpperCase() })} required /></label>
                 <label className="formField"><span>{ar ? 'عدد التوليدات شهرياً' : 'Generations per month'}</span><input className="input" type="number" min={1} step={1} value={plan.generationLimit} onChange={(e) => edit(plan.tier, { generationLimit: Math.max(1, Number(e.target.value || 1)) })} required /></label>
               </div>
